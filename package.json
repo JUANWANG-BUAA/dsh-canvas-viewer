@@ -1,0 +1,65 @@
+{
+  "name": "dsh-canvas-viewer",
+  "version": "0.1.1",
+  "description": "DeepSeek Harness plugin + dsh-native canvas-analysis-report skill: open .canvas.tsx reports in a floating viewer with a settings library.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JUANWANG-BUAA/dsh-canvas-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JUANWANG-BUAA/dsh-canvas-viewer/issues"
+  },
+  "homepage": "https://github.com/JUANWANG-BUAA/dsh-canvas-viewer#readme",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "canvas",
+    "cursor-canvas"
+  ],
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "AGENTS.md",
+    "docs",
+    "skills",
+    "scripts"
+  ],
+  "scripts": {
+    "test": "node scripts/self-test.mjs",
+    "test:compile": "node scripts/compile-sample.mjs",
+    "open:sample": "node scripts/open-sample.mjs",
+    "sync:dsh": "bash scripts/sync-install.sh"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "dependencies": {
+    "sucrase": "^3.35.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
