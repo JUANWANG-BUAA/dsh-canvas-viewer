@@ -19,7 +19,7 @@ DeepSeek Harness **Host + Web UI** 插件：把 Cursor 风格的 `.canvas.tsx` �
 dsh plugin --profile web add github:JUANWANG-BUAA/dsh-canvas-viewer
 
 # 或本地实拷（开发）
-cd /path/to/dsh-canvas-viewer
+cd ~/code/agent_harness/dsh-canvas-viewer
 pnpm test
 bash scripts/sync-install.sh   # → ~/.dsh/plugins + ~/.dsh/skills
 ```
