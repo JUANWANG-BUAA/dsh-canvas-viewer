@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Fix click-to-open for bare filenames in chat (`foo.canvas.tsx`): resolve via `~/.cursor/projects/*/canvases` and `~/.dsh/canvases` instead of `process.cwd()` (avoids ENOENT under the plugin checkout).
+
 ## 0.1.2
 
 - Canvas renderer overhaul aligned with Cursor canvas dark tokens (CSS variables).

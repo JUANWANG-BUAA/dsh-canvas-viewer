@@ -3,7 +3,7 @@
  * Lightweight regression checks for Host compile + path guards.
  * Run: node scripts/self-test.mjs
  */
-import { compileCanvas, isCanvasPath, resolveCanvasPath } from "../lib/index.js";
+import { compileCanvas, findCanvasByName, isCanvasPath, resolveCanvasPath } from "../lib/index.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -24,6 +24,13 @@ try {
   rejected = true;
 }
 assert(rejected, "must reject outside home");
+
+const probe = "ds-fim-engineering-doc.canvas.tsx";
+const found = findCanvasByName(probe);
+if (found) {
+  assert(resolveCanvasPath(probe) === found, "basename resolves to canvases/");
+  assert(found.includes("/canvases/"), "found under canvases");
+}
 
 const source = `import { H1, Stack, Text, Table, mergeStyle } from "cursor/canvas";
 export default function SelfTest() {
