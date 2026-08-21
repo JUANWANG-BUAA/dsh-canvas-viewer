@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+- Canvas renderer overhaul aligned with Cursor canvas dark tokens (CSS variables).
+- Components: `Table` (`rowTone`/`striped`/`framed`/`stickyHeader`), `CardHeader.trailing`, `TodoList`, `Swatch`, `UsageBar`, `BarChart`/`LineChart`/`PieChart`, `CollapsibleSection`, `mergeStyle`, richer `Pill`/`Stat`/`Text`/`Button`.
+- `computeDAGLayout` now returns `width`/`height` on nodes and `points` on edges (SVG-ready).
+- Skill `sdk.md` updated to the new subset.
+
 ## 0.1.1
 
 - Skill `canvas-analysis-report` 改为 **dsh 自洽**：去掉对 `~/.cursor/skills-cursor/canvas` 的硬依赖；增加 [sdk.md](skills/canvas-analysis-report/sdk.md) 与 viewer 子集对齐的模板。

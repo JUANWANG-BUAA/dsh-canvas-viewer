@@ -2,7 +2,7 @@
 
 Copy the skeleton that matches the genre. Replace names, tabs, and data. Import **only** from `"cursor/canvas"` using the [sdk.md](sdk.md) subset. Default-export the page component. Embed data inline.
 
-Props not listed in sdk.md (e.g. `rowTone`, `striped`, `CardHeader trailing`) are **ignored or unsafe** — do not use them.
+Props not listed in sdk.md are **ignored or unsafe** — do not invent Cursor-only APIs beyond the documented subset. `rowTone` / `CardHeader trailing` / charts **are** supported.
 
 ## Investigation skeleton
 
@@ -103,9 +103,9 @@ function Quality() {
   return (
     <Stack gap={20}>
       <H2>按用户能感觉到的轴拆，不要按目录拆</H2>
-      <Card>
-        <CardHeader title="file-name.ts · P0" />
-        <CardBody>
+        <Card>
+          <CardHeader title="file-name.ts" trailing={<Pill size="sm" tone="red" active>P0</Pill>} />
+          <CardBody>
           <Stack gap={8}>
             <Text>
               行为：<Code>fn</Code> 做了 X。后果：用户看到 Y。
@@ -119,6 +119,8 @@ function Quality() {
       <Table
         headers={["优先级", "问题", "现状", "影响", "改法"]}
         rows={[["P0", "跳过过窄", "只跳过 markdown", "注释里乱补", "按 token 类型跳过"]]}
+        rowTone={["danger"]}
+        striped
       />
     </Stack>
   );

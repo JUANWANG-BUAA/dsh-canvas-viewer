@@ -37,41 +37,28 @@ If `view_canvas` is missing, say the plugin is not mounted; still write the file
 
 ## Allowed SDK (must match dsh-canvas-viewer)
 
-Import **only** from `"cursor/canvas"`. The string is a shim identity: dsh-canvas-viewer strips these imports and injects its subset runtime. **Unsupported exports will break the preview.**
+Import **only** from `"cursor/canvas"`. The string is a shim identity: dsh-canvas-viewer strips these imports and injects its subset runtime. **Unsupported exports will break the preview.** Full prop contract: [sdk.md](sdk.md).
 
 ### Components & hooks (allowed)
 
-| Export | Role | Notes |
-|---|---|---|
-| `Stack` | Vertical flex | `gap`, `style`, `children` |
-| `Row` | Horizontal flex | `gap`, `align`, `wrap`, `style` |
-| `Grid` | CSS grid | `columns` (number or template), `gap` |
-| `H1` `H2` `H3` | Headings | Children text |
-| `Text` | Body | `tone`/`variant`: `secondary` \| `muted` \| `tertiary`; `size`: `small`; `weight`: `semibold` \| `bold`; `as`: `span` \| `p` |
-| `Pill` | Tab / tag button | `active`/`selected`/`current`, `onClick` |
-| `Stat` | KPI tile | `value`, `label`/`title` |
-| `Card` `CardHeader` `CardBody` | Named entity blocks | Prefer tables for catalogs |
-| `Callout` | Highlight | `tone`/`variant`: `info` \| `warning` \| `danger` \| `success`; optional `title` |
-| `Code` | Inline code | |
-| `Divider` `Spacer` | Layout chrome | |
-| `Button` `Link` | Actions | Prefer rare use in reports |
-| `Table` | Evidence tables | `headers`/`columns` + `rows` (array-of-arrays or objects) |
-| `TodoListCard` | Roadmap list | `title`, `todos`/`items` with `content`/`text`/`status` |
-| `useState` `useMemo` `useEffect` `useRef` `useCallback` `useId` | React hooks | From shim |
-| `useHostTheme` | Theme tokens | `{ bg, text, textSecondary, border, accent }` |
-| `useCanvasState` | Local persist helper | Same as `useState` in viewer |
-| `useCanvasAction` | No-op in viewer | Do not rely on side effects |
-| `computeDAGLayout` | Graph layout | Returns `{ nodes, edges, width, height }` for SVG |
-| `Fragment` | React fragment | |
+| Export | Role |
+|---|---|
+| `Stack` `Row` `Grid` `Divider` `Spacer` `mergeStyle` | Layout |
+| `H1` `H2` `H3` `Text` `Pill` `Stat` `Code` | Type / chrome |
+| `Card` `CardHeader` `CardBody` `Callout` | Surfaces (`CardHeader.trailing` supported) |
+| `Table` | Evidence (`rowTone`, `striped`, `framed`, `stickyHeader`) |
+| `TodoList` `TodoListCard` | Roadmaps |
+| `Swatch` `UsageBar` `BarChart` `LineChart` `PieChart` | Sparse metrics (only measured facts) |
+| `CollapsibleSection` | Progressive disclosure |
+| `Button` `Link` | Rare actions |
+| hooks + `computeDAGLayout` `Fragment` | Theme / state / DAG |
 
-### Forbidden (viewer will not provide)
+### Forbidden
 
-- Charts / spark lines / image components / markdown renderers not listed above
-- Unknown `cursor/canvas` exports guessed from Cursor IDE docs
-- CSS frameworks, remote URLs as script sources, `eval`
-- Empty placeholder rows, fake latency charts, adjective Stats (`"good"`)
+- Unknown Cursor-only exports not listed above
+- Gradients, decorative shadows, emoji chrome
+- Fake charts / empty placeholder rows
 
-Full prop cheat-sheet: [sdk.md](sdk.md). Skeletons: [templates.md](templates.md). Patterns: [examples.md](examples.md).
 
 ## When to use
 
@@ -125,7 +112,7 @@ Stack(gap=24)
 
 **Mix density.** `H2` + `Table` for catalogs. `Card` only for a *named* entity. Two side-by-side cards max for 做 / 不做.
 
-**Color is sparse.** One `Callout`, occasional table emphasis — most of the page stays neutral. (Viewer `Table` ignores `rowTone`; encode priority in a column or `Pill` instead.)
+**Color is sparse.** Prefer tokens from `useHostTheme()`. `Table` supports `rowTone` dots; do not rainbow every row.
 
 ## Genre A — Investigation / audit / optimization
 

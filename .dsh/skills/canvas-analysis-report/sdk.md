@@ -1,91 +1,101 @@
 # dsh-canvas-viewer SDK subset
 
-Authoritative for agents writing `.canvas.tsx` files that `dsh-canvas-viewer` can render. Imports use the module id `"cursor/canvas"`; the Host strips them and injects this runtime.
+Authoritative for agents writing `.canvas.tsx` files that `dsh-canvas-viewer` can render. Imports use `"cursor/canvas"`; the Host strips them and injects this runtime.
+
+Aligned with Cursor canvas tokens (dark) and a practical subset of primitives — not the full IDE surface.
 
 ```ts
 import {
   Stack, Row, Grid,
   H1, H2, H3, Text, Pill, Stat,
   Card, CardHeader, CardBody, Callout, Code, Divider, Spacer,
-  Button, Link, Table, TodoListCard,
+  Button, Link, Table, TodoList, TodoListCard,
+  Swatch, UsageBar, BarChart, LineChart, PieChart, CollapsibleSection,
+  mergeStyle,
   useHostTheme, useCanvasState, useCanvasAction,
   useState, useMemo, useEffect, useRef, useCallback, useId,
   computeDAGLayout, Fragment,
 } from "cursor/canvas";
 ```
 
+## Theme (`useHostTheme`)
+
+Prefer tokens over hardcoded hex.
+
+```ts
+const theme = useHostTheme();
+theme.kind                 // "dark"
+theme.bg / theme.panel / theme.text / theme.textSecondary / theme.border / theme.accent
+theme.text.primary|secondary|tertiary|quaternary|link
+theme.bg.editor|chrome|elevated
+theme.stroke.primary|secondary|tertiary|focused
+theme.fill.primary|secondary|tertiary|quaternary
+theme.category.blue|green|orange|red|purple|yellow|cyan|pink|gray
+theme.palette              // ordered accent list for charts
+```
+
 ## Layout
 
-### `Stack` / `Row`
-
-| Prop | Type | Default |
-|---|---|---|
-| `gap` | `number` | `10` |
-| `align` | string (`Row`) | `"center"` |
-| `wrap` | boolean (`Row`) | `true` |
-| `style` | CSSProperties | |
-| `children` | ReactNode | |
-
-### `Grid`
-
-| Prop | Type | Notes |
-|---|---|---|
-| `columns` | `number` \| `string` | number → `repeat(n, minmax(0,1fr))` |
-| `gap` | `number` | |
-| `style` | CSSProperties | |
-| `children` | ReactNode | |
+| Component | Key props |
+|---|---|
+| `Stack` | `gap`, `style` |
+| `Row` | `gap`, `align` (`start`/`center`/`end`/`stretch`), `justify`, `wrap` |
+| `Grid` | `columns` (number or CSS), `gap`, `align` |
+| `Divider` | hairline |
+| `Spacer` | flex spacer (`grow`) |
+| `mergeStyle(base, override)` | shallow merge for small tweaks — no decorative gradients |
 
 ## Typography & chrome
 
-- `H1` / `H2` / `H3` — `children`, optional `style`
-- `Text` — `tone` | `variant`: `secondary` | `muted` | `tertiary`; `size`: `small`; `weight`: `semibold` | `bold`; `as`: `span` | `p`
-- `Pill` — button; selected when `active` | `selected` | `current`; `onClick`
-- `Stat` — `value`, `label` | `title`
-- `Callout` — `tone` | `variant`: `info` | `warning` | `danger` | `success`; optional `title`
-- `Code` — inline
-- `Divider` — no props
-- `Spacer` — `size` height or `grow`
-- `Button` / `Link` — prefer rare use in reports (`href` | `to`)
+- `H1` 24/30 · `H2` 18/24 · `H3` 16/22 · weight 590
+- `Text` — `tone`: primary/secondary/tertiary/quaternary; `size`: body/small; `weight`; `italic`; `truncate`; `as`
+- `Pill` — `active`/`selected`, `size`: sm, optional `tone`/`color`
+- `Stat` — `value`, `label`, optional `tone`: success/danger/warning/info
+- `Callout` — `tone`: info/warning/danger/success; optional `title`
+- `Code` · `Button` (`variant`: ghost/primary/secondary) · `Link`
 
 ## Cards & lists
 
-- `Card` / `CardHeader` (`title` or children) / `CardBody`
-- `TodoListCard` — `title`, `todos` | `items`: string or `{ id?, content|text|title, status? }`
+- `Card` / `CardHeader` (`title`, `trailing`) / `CardBody`
+- `TodoList` / `TodoListCard` — `todos` with `content` + `status`
 
 ## `Table`
-
-Prefer:
 
 ```tsx
 <Table
   headers={["问题", "现状", "影响", "改法"]}
-  rows={[
-    ["…", "…", "…", "…"],
-  ]}
+  rows={[["…", "…", "…", "…"]]}
+  rowTone={["danger", "warning"]}
+  striped
+  columnAlign={["left", "left", "left", "left"]}
 />
 ```
 
-Also accepts `columns` + object `rows`. **No `rowTone` support** — put priority in a column or a trailing `Pill`.
+Also: `framed` (default true), `stickyHeader`, `emptyMessage`, object rows + `columns`.
 
-## Hooks & layout helpers
+## Charts & meters
+
+- `Swatch` — `color` category key or hex
+- `UsageBar` — `segments: [{ label, value, color }]`
+- `BarChart` / `LineChart` — `series` or `data`, optional `categories`/`height`/`width`
+- `PieChart` — `data: [{ value, color?, label? }]`
+- `CollapsibleSection` — `title`, `defaultOpen`, `trailing`
+
+Use sparingly; invented metrics are still forbidden by the skill.
+
+## DAG
 
 ```ts
-const theme = useHostTheme();
-// { bg, panel, text, textSecondary, border, accent }
-
 const layout = computeDAGLayout({
   nodes: [{ id: "a" }, { id: "b" }],
   edges: [{ from: "a", to: "b" }],
-  direction: "vertical", // or "horizontal"
+  direction: "vertical",
 });
-// layout.nodes[i] => { id, x, y, width, height }
-// layout.edges[i] => { from, to, points: [{x,y}, ...] }
-// layout.width, layout.height
+// node: { id, x, y, width, height, rank, order }
+// edge: { sourceX/Y, targetX/Y, points: [{x,y}…] }
 ```
 
-Draw SVG yourself with `theme.*` fills/strokes. Keep ≤ 8 nodes.
-
-`useCanvasState` ≈ `useState`. `useCanvasAction` is a no-op — do not depend on it.
+Draw SVG with `theme.*` fills/strokes. Keep ≤ 8 nodes.
 
 ## File shape
 
@@ -95,4 +105,4 @@ export default function MyReport() {
 }
 ```
 
-One default-export function. No other modules. Embed data inline.
+One default-export function. Embed data inline.

@@ -25,19 +25,21 @@ try {
 }
 assert(rejected, "must reject outside home");
 
-const source = `import { H1, Stack, Text } from "cursor/canvas";
+const source = `import { H1, Stack, Text, Table, mergeStyle } from "cursor/canvas";
 export default function SelfTest() {
   return (
-    <Stack gap={12}>
+    <Stack gap={12} style={mergeStyle({ padding: 4 })}>
       <H1>ok</H1>
       <Text tone="secondary">probe</Text>
+      <Table headers={["a"]} rows={[["1"]]} rowTone={["info"]} striped />
     </Stack>
   );
 }
 `;
 const compiled = await compileCanvas(source);
 assert(compiled.includes("function SelfTest"), "keeps component");
+assert(compiled.includes("BarChart"), "prelude exports charts");
 assert(compiled.includes("sdk"), "injects sdk prelude");
 assert(!compiled.includes('from "cursor/canvas"'), "strips import");
 
-console.log(JSON.stringify({ ok: true, checks: 6 }, null, 2));
+console.log(JSON.stringify({ ok: true, checks: 7 }, null, 2));
