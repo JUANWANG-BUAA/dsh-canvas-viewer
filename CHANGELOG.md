@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.9
+
+- **本地刷新可靠性**：`scripts/sync-install.sh` 增加进程级 `DSH_GIT_URL_BASE` 与 `DSH_NPM_REGISTRY` 传输覆盖，处理 profile 中无关 Git/npm 依赖的网络差异；不修改全局 Git 配置，也不直接覆盖 profile 的 `node_modules`。
+- **安装文档**：中英文 README 补充本地开发、社区安装、刷新失败边界和可复现排错方式。
+- **验证**：Host、生命周期、沙箱、渲染和 Playwright 浏览器 CI 全部通过。
+
 ## 0.4.8
 
 - **资产安全与缓存**：上传与读取现在校验真实图片签名、拒绝 URL 编码目录穿越和伪装文件；上传使用随机临时文件 + 原子替换，缩略图响应增加 ETag、nosniff、same-origin 和私有缓存重验证。

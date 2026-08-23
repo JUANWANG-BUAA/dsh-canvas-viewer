@@ -123,7 +123,7 @@ assert(CAPABILITIES.budget.maxLines === null && CAPABILITIES.budget.maxBytes ===
 assert(CAPABILITIES.sandbox.level === "iframe-sandbox", "sandbox capability advertised");
 assert(CAPABILITIES.assets.upload.includes("/api/canvas/assets"), "asset upload capability advertised");
 assert(CAPABILITIES.assets.preview.includes("/api/canvas/assets/raw"), "asset preview capability advertised");
-assert(CAPABILITIES.version === "0.4.8", "capabilities version matches package release");
+assert(CAPABILITIES.version === "0.4.9", "capabilities version matches package release");
 assert(CAPABILITIES.sandbox.fallback.includes("fail-closed"), "sandbox fallback is fail-closed");
 assert(readFileSync(new URL("../lib/index.js", import.meta.url), "utf8").includes("hard-budget 拦截"), "hard budget error remains explicit");
 assert(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").includes("允许兼容渲染"), "legacy rendering requires explicit user action");
