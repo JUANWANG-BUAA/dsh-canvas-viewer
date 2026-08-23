@@ -1,6 +1,6 @@
 # Canvas 执行沙箱（SANDBOX）
 
-## 现状（0.4.6 · 资产、预算与模块沙箱阶段已落地）
+## 现状（0.4.7 · 资产、预算与模块沙箱阶段已落地）
 
 `CanvasMount` 默认在 **`<iframe sandbox="allow-scripts">`**（opaque origin）里渲染 canvas 报告：
 

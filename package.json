@@ -1,6 +1,6 @@
 {
   "name": "dsh-canvas-viewer",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "DeepSeek Harness plugin + dsh-native canvas-analysis-report skill: open .canvas.tsx reports in a floating viewer with a settings library.",
   "type": "module",
   "license": "MIT",
@@ -44,10 +44,11 @@
     "scripts"
   ],
   "scripts": {
-    "test": "node scripts/sync-skill-mirrors.mjs --check && node scripts/syntax-check.mjs && node scripts/package-contract.mjs && node scripts/self-test.mjs && node scripts/budget-report.mjs && node scripts/cordis-lifecycle.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
+    "test": "node scripts/sync-skill-mirrors.mjs --check && node scripts/syntax-check.mjs && node scripts/package-contract.mjs && node scripts/client-contract.mjs && node scripts/self-test.mjs && node scripts/budget-report.mjs && node scripts/cordis-lifecycle.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
     "test:sandbox": "node scripts/sandbox-e2e.mjs",
     "test:lifecycle": "node scripts/cordis-lifecycle.mjs",
     "test:browser": "node scripts/browser-smoke.mjs",
+    "test:client": "node scripts/client-contract.mjs",
     "test:syntax": "node scripts/syntax-check.mjs",
     "test:compile": "node scripts/compile-sample.mjs",
     "test:regression": "node scripts/regression.mjs",

@@ -52,6 +52,7 @@ Canvas files are executable code. Open only trusted `.canvas.tsx` files even tho
 
 ```sh
 pnpm test             # mirrors, syntax, host checks, lifecycle, regressions, sandbox e2e
+pnpm test:client      # external factory, module seams, and client size budget
 pnpm test:browser     # Playwright smoke: chat tail + real sandbox iframe
 pnpm audit --prod
 npm pack --dry-run

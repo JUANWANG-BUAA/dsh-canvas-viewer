@@ -76,6 +76,7 @@ pnpm test                 # skill 镜像校验 + 语法(2) + 自测(88) + 全量
 node scripts/self-test.mjs
 node scripts/regression.mjs
 node scripts/sandbox-e2e.mjs
+node scripts/client-contract.mjs  # external factory + source module seams + size budget
 node scripts/sandbox-harness.mjs   # 需要浏览器时：本地起 iframe 沙箱演示页（开发用）
 bash scripts/sync-install.sh   # 只经 dsh plugin 管理本插件；会校验并按需定向刷新，不批准其他包的构建脚本
 ```

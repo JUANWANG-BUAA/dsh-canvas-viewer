@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.7
+
+- **图库像素预览**：对源码明确引用的首张 `asset://` 图片增加受限原始资产路由和懒加载真实像素缩略图；不执行整个报告，不改变 iframe 禁网策略。
+- **客户端工程契约**：增加源码模块边界、单 factory/无浏览器 import/180KB 体积检查，防止 `lib/client.js` 在等待构建层拆分期间继续无约束膨胀。
+- **安装可靠性**：本地刷新同步中英文 README 与资产 Host 模块，避免 dsh profile 保留不完整副本。
+
 ## 0.4.6
 
 - **沙箱安全**：默认 iframe CSP 改用 Blob ES modules 装载 SDK/报告，不再依赖 `unsafe-eval`；主线程 `new Function` 仅保留为用户明确点击后的兼容降级。
