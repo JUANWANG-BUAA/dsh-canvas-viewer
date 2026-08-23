@@ -171,6 +171,7 @@ assert(!clientSrc.includes("hasLineBudget") && !clientSrc.includes("metaInfo"), 
 assert(!clientSrc.includes('"aria-modal": "true"'), "aria-modal omitted (host mobile-sheet selector collision)");
 assert(clientSrc.includes("new MessageChannel()") && clientSrc.includes("dsh-cv:init"), "sandbox MessageChannel handshake present");
 assert(clientSrc.includes("connect-src 'none'") && clientSrc.includes("worker-src 'none'"), "sandbox CSP blocks network and workers");
+assert(clientSrc.includes("script-src 'unsafe-inline' 'unsafe-eval'"), "sandbox CSP permits the compiled Function runtime explicitly");
 assert(clientSrc.includes("Content-Security-Policy"), "sandbox CSP meta is installed");
 assert(hostSrc.includes("migrationBy") && hostSrc.includes("row.provenance"), "host annotates provenance from migration manifest");
 assert(clientSrc.includes("budgetState") && clientSrc.includes("refreshBudget"), "client reads budget policy from capabilities");
@@ -178,6 +179,7 @@ assert(hostSrc.includes("getBudgetPolicy") && hostSrc.includes('budget.enforce')
 assert(hostSrc.includes("let path;") && hostSrc.includes("if (path)"), "hard-budget rejection is outside the path-resolution catch");
 assert(hostSrc.includes("preact.umd.js") && hostSrc.includes("preact-compat"), "host sandbox bundle serves preact-compat");
 assert(clientSrc.includes("window.preactCompat") && clientSrc.includes("ReactDOM.createRoot"), "client srcdoc boots preact compat with createRoot shim");
+assert(hostSrc.includes("function closeAllHotWatchers") && hostSrc.includes("closeAllHotWatchers();"), "plugin disposal closes SSE watchers and clients");
 assert(clientSrc.includes("dsh-cv-lib-row-summary"), "gallery presents one compact structural summary per report");
 assert(hostSrc.includes("previewSignature") && hostSrc.includes("readCanvasSource"), "host annotates gallery rows with structural preview");
 assert(!clientSrc.includes("TEMP BISECT PROBE") && !clientSrc.includes("mergedProbe"), "no leftover bisect probe / old call-timing bubble path");

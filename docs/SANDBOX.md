@@ -20,7 +20,7 @@
 - `Object.freeze(sdk)`（主线程兼容路径同样加固）。
 - `jsonSafe()` 序列化 SDK/编译产物时转义 `<`，杜绝 srcdoc 内 `</script>` 提前闭合。
 - iframe 无 `allow-same-origin`（opaque origin），无 `allow-forms`/`allow-popups`/`allow-modals`。
-- srcdoc CSP 只允许 inline script/style、data/blob 图片与 data 字体；报告仍是可执行代码，必须只打开可信文件。
+- srcdoc CSP 只允许 inline script/style（并显式保留 `unsafe-eval` 以兼容当前 `Function()` 编译运行时）、data/blob 图片与 data 字体；`connect-src 'none'`、worker、form、frame 与 object 均禁用。报告仍是可执行代码，必须只打开可信文件。
 
 ## 已落地（0.3.0）
 

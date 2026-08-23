@@ -26,6 +26,7 @@ assert(clientSrc.includes('"dsh:canvas:theme", sendTheme'), "theme toggles are p
 assert(clientSrc.includes('d.type === "dsh-cv:esc"'), "esc pressed inside the sandbox closes the host window");
 assert(clientSrc.includes('new EventSource(API + "/watch'), "viewer subscribes to the hot-reload SSE stream");
 assert(clientSrc.includes("connect-src 'none'") && clientSrc.includes("default-src 'none'"), "srcdoc CSP denies outbound connections by default");
+assert(clientSrc.includes("script-src 'unsafe-inline' 'unsafe-eval'"), "srcdoc CSP documents the required compiled runtime eval");
 assert(clientSrc.includes('API + "/save"'), "viewer saves edited source back to the host");
 assert(clientSrc.includes('"data-split": showSrc ? "1" : "0"'), "source/render split view present");
 assert(clientSrc.includes('"tool/result"') && clientSrc.includes("content[0].isError") && clientSrc.includes("source.callId"), "chat bubble gates on real tool/result message shape");

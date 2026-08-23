@@ -42,7 +42,7 @@
     "scripts"
   ],
   "scripts": {
-    "test": "node scripts/sync-skill-mirrors.mjs --check && node scripts/syntax-check.mjs && node scripts/self-test.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
+    "test": "node scripts/sync-skill-mirrors.mjs --check && node scripts/syntax-check.mjs && node scripts/package-contract.mjs && node scripts/self-test.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
     "test:sandbox": "node scripts/sandbox-e2e.mjs",
     "test:syntax": "node scripts/syntax-check.mjs",
     "test:compile": "node scripts/compile-sample.mjs",
