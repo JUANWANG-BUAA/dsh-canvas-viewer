@@ -7,6 +7,7 @@
  */
 import { CAPABILITIES, cleanRef, compileCanvas, findCanvasByName, isCanvasPath, locateCompileError, openCanvas, resolveCanvasPath, sandboxBundle, writableCanvasTarget } from "../lib/index.js";
 import { previewSignature } from "../lib/preview.mjs";
+import { budgetMessage, budgetStatus, estimateCanvasTokens, normalizeBudget, RECOMMENDED_MAX_BYTES, RECOMMENDED_MAX_LINES, RECOMMENDED_MAX_TOKENS } from "../lib/host/budget.mjs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { readFileSync } from "node:fs";
@@ -111,13 +112,25 @@ assert(CAPABILITIES.components.BarChart.props.includes("referenceLines"), "chart
 assert(CAPABILITIES.components.Table.props.includes("sortable"), "table sortable advertised");
 assert(CAPABILITIES.features.hotReload.includes("/api/canvas/watch"), "hot reload advertised");
 assert(CAPABILITIES.features.sourceEdit.includes("/api/canvas/save"), "source save advertised");
-assert(CAPABILITIES.limits.recommendedMaxLines === null, "line budget is opt-in by default");
+assert(CAPABILITIES.limits.recommendedMaxLines === RECOMMENDED_MAX_LINES, "recommended line budget is advertised");
+assert(CAPABILITIES.limits.recommendedMaxBytes === RECOMMENDED_MAX_BYTES, "recommended byte budget is advertised");
+assert(CAPABILITIES.limits.recommendedMaxTokens === RECOMMENDED_MAX_TOKENS, "recommended token budget is advertised");
+assert(CAPABILITIES.budget.maxLines === null && CAPABILITIES.budget.maxBytes === null && CAPABILITIES.budget.maxTokens === null, "budgets remain opt-in by default");
 assert(CAPABILITIES.sandbox.level === "iframe-sandbox", "sandbox capability advertised");
 assert(CAPABILITIES.version === "0.4.4", "capabilities version matches package release");
 assert(CAPABILITIES.sandbox.fallback.includes("fail-closed"), "sandbox fallback is fail-closed");
 assert(readFileSync(new URL("../lib/index.js", import.meta.url), "utf8").includes("hard-budget 拦截"), "hard budget error remains explicit");
 assert(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").includes("允许兼容渲染"), "legacy rendering requires explicit user action");
 ok("capabilities manifest");
+
+// --- budget telemetry ---
+assert(estimateCanvasTokens("abcd") === 1, "ascii token estimate is stable");
+assert(estimateCanvasTokens("中文") === 2, "non-ascii token estimate is conservative");
+const budget = normalizeBudget({ maxLines: 2, maxBytes: 4, maxTokens: 1, enforce: "hard" });
+const status = budgetStatus({ lines: 3, bytes: 5, estimatedTokens: 2 }, budget);
+assert(status.overBudget && status.violations.join(",") === "lines,bytes,tokens", "budget reports all dimensions");
+assert(budgetMessage({ lines: 3, bytes: 5, estimatedTokens: 2 }, budget).includes("tokens"), "budget message explains token overflow");
+ok("budget telemetry");
 
 // --- sandbox bundle ---
 const sb = await sandboxBundle();
@@ -180,6 +193,7 @@ assert(clientSrc.includes("Content-Security-Policy"), "sandbox CSP meta is insta
 assert(hostSrc.includes("migrationBy") && hostSrc.includes("row.provenance"), "host annotates provenance from migration manifest");
 assert(clientSrc.includes("budgetState") && clientSrc.includes("refreshBudget"), "client reads budget policy from capabilities");
 assert(hostSrc.includes("getBudgetPolicy") && hostSrc.includes('budget.enforce') && hostSrc.includes("hard-budget 拦截"), "host budget policy (unrestricted default, hard opt-in)");
+assert(hostSrc.includes("estimatedTokens") && hostSrc.includes("maxBytes") && hostSrc.includes("maxTokens"), "host exposes byte/token telemetry");
 assert(hostSrc.includes("let path;") && hostSrc.includes("if (path)"), "hard-budget rejection is outside the path-resolution catch");
 assert(hostSrc.includes("preact.umd.js") && hostSrc.includes("preact-compat"), "host sandbox bundle serves preact-compat");
 assert(clientSrc.includes("window.preactCompat") && clientSrc.includes("ReactDOM.createRoot"), "client srcdoc boots preact compat with createRoot shim");

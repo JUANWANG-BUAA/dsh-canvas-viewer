@@ -16,6 +16,7 @@ const required = [
   "lib/host/http.mjs",
   "lib/host/compiler.mjs",
   "lib/host/hot-reload.mjs",
+  "lib/host/budget.mjs",
   "cordis.patch.yml",
   "THIRD-PARTY-NOTICES.md",
   "skills/canvas-analysis-report/SKILL.md",
