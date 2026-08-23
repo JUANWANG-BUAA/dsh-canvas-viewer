@@ -42,10 +42,11 @@ let saveRejectedTmp = false;
 try { writableCanvasTarget("/tmp/evil.canvas.tsx"); } catch { saveRejectedTmp = true; }
 assert(saveRejectedTmp, "save must reject /tmp paths");
 {
-  const { symlink, unlink, writeFile } = await import("node:fs/promises");
+  const { mkdir, symlink, unlink, writeFile } = await import("node:fs/promises");
   const link = join(homedir(), ".dsh", "canvases", "z-selftest-outside.canvas.tsx");
   const outside = join(tmpdir(), `dsh-canvas-viewer-outside-${process.pid}.canvas.tsx`);
   try {
+    await mkdir(join(homedir(), ".dsh", "canvases"), { recursive: true });
     await writeFile(outside, "export default function Outside() { return null; }\n", "utf8");
     await unlink(link).catch(() => {});
     await symlink(outside, link);
