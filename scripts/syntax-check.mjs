@@ -10,6 +10,10 @@ import { fileURLToPath } from "node:url";
 const files = [
   new URL("../lib/index.js", import.meta.url),
   new URL("../lib/client.js", import.meta.url),
+  new URL("../lib/host/paths.mjs", import.meta.url),
+  new URL("../lib/host/http.mjs", import.meta.url),
+  new URL("../lib/host/compiler.mjs", import.meta.url),
+  new URL("../lib/host/hot-reload.mjs", import.meta.url),
 ].map(fileURLToPath);
 
 let failed = false;

@@ -159,8 +159,10 @@ ok("openCanvas payload");
 // --- UI / mobile surface (source-level regression net) ---
 const clientFile = join(dirname(fileURLToPath(import.meta.url)), "..", "lib", "client.js");
 const hostFile = join(dirname(fileURLToPath(import.meta.url)), "..", "lib", "index.js");
+const hotReloadFile = join(dirname(fileURLToPath(import.meta.url)), "..", "lib", "host", "hot-reload.mjs");
 const clientSrc = readFileSync(clientFile, "utf8");
 const hostSrc = readFileSync(hostFile, "utf8");
+const hotReloadSrc = readFileSync(hotReloadFile, "utf8");
 assert(clientSrc.includes("data-dsh-cv-theme") && clientSrc.includes("toggleTheme"), "theme toggle wired");
 assert(clientSrc.includes("dsh-cv-lib-topline-actions") && clientSrc.includes("dsh-cv-lib-count"), "gallery uses a compact title row with theme control and count");
 assert(clientSrc.includes("dsh-cv-lib-menu") && clientSrc.includes("更多操作"), "gallery groups secondary actions in a compact menu");
@@ -179,7 +181,7 @@ assert(hostSrc.includes("getBudgetPolicy") && hostSrc.includes('budget.enforce')
 assert(hostSrc.includes("let path;") && hostSrc.includes("if (path)"), "hard-budget rejection is outside the path-resolution catch");
 assert(hostSrc.includes("preact.umd.js") && hostSrc.includes("preact-compat"), "host sandbox bundle serves preact-compat");
 assert(clientSrc.includes("window.preactCompat") && clientSrc.includes("ReactDOM.createRoot"), "client srcdoc boots preact compat with createRoot shim");
-assert(hostSrc.includes("function closeAllHotWatchers") && hostSrc.includes("closeAllHotWatchers();"), "plugin disposal closes SSE watchers and clients");
+assert(hostSrc.includes("hotReload.closeAll();") && hotReloadSrc.includes("function closeAll()"), "plugin disposal closes SSE watchers and clients");
 assert(clientSrc.includes("dsh-cv-lib-row-summary"), "gallery presents one compact structural summary per report");
 assert(hostSrc.includes("previewSignature") && hostSrc.includes("readCanvasSource"), "host annotates gallery rows with structural preview");
 assert(!clientSrc.includes("TEMP BISECT PROBE") && !clientSrc.includes("mergedProbe"), "no leftover bisect probe / old call-timing bubble path");

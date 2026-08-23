@@ -30,6 +30,7 @@
     "lib/index.js",
     "lib/client.js",
     "lib/preview.mjs",
+    "lib/host",
     "assets",
     "cordis.patch.yml",
     "README.md",
