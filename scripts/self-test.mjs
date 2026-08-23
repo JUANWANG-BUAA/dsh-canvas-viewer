@@ -268,6 +268,7 @@ assert(clientSrc.includes("window.preactCompat") && clientSrc.includes("ReactDOM
 assert(hostSrc.includes("hotReload.closeAll();") && hotReloadSrc.includes("function closeAll()"), "plugin disposal closes SSE watchers and clients");
 assert(hostSrc.includes("watchDirs: [DSH_CANVAS_ASSET_DIR]") && hotReloadSrc.includes("ensureDirectoryWatchers"), "asset directory watcher is lifecycle-owned");
 assert(installSrc.includes("verify_profile_copy") && installSrc.includes('dsh plugin --profile web remove "$PKG"'), "local install verifies and refreshes stale same-version packages");
+assert(installSrc.includes("README.en.md") && installSrc.includes("lib/host/assets.mjs"), "local install syncs bilingual docs and asset host module");
 assert(!installSrc.includes("approve-builds"), "local install never approves unrelated build scripts");
 assert(clientSrc.includes("dsh-cv-lib-row-summary"), "gallery presents one compact structural summary per report");
 assert(hostSrc.includes("previewSignature") && hostSrc.includes("readCanvasSource"), "host annotates gallery rows with structural preview");

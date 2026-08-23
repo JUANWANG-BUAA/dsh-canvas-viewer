@@ -26,6 +26,7 @@ rsync -a \
   --include='lib/***' --include='skills/***' --include='docs/***' --include='assets/***' \
   --include='package.json' --include='cordis.patch.yml' \
   --include='README.md' --include='AGENTS.md' --include='LICENSE' --include='CHANGELOG.md' \
+  --include='README.en.md' \
   --include='THIRD-PARTY-NOTICES.md' \
   --exclude='*' \
   "$ROOT/" "$DEST/"
@@ -53,7 +54,9 @@ verify_profile_copy() {
     lib/host/paths.mjs \
     lib/host/compiler.mjs \
     lib/host/hot-reload.mjs \
-    lib/host/http.mjs; do
+    lib/host/http.mjs \
+    lib/host/assets.mjs \
+    README.en.md; do
     [ -f "$installed/$file" ] || return 1
     cmp -s "$DEST/$file" "$installed/$file" || return 1
   done
