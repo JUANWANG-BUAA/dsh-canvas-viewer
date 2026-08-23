@@ -41,6 +41,30 @@ const payload = {
   bytes: Buffer.byteLength(fixtureSource),
 };
 
+// A real 1×1 PNG keeps this test independent of external assets while still
+// proving that Chromium fetched and decoded the raw thumbnail endpoint.
+const thumbnailBytes = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+const libraryItem = {
+  path: fixturePath,
+  title: "audit-sample.canvas.tsx",
+  shortPath: "~/fixtures/audit-sample.canvas.tsx",
+  bytes: payload.bytes,
+  lines: payload.lines,
+  estimatedTokens: Math.ceil(payload.bytes / 4),
+  warnings: [],
+  overBudget: false,
+  violations: [],
+  preview: { headline: "Browser smoke fixture", assetRef: "asset://thumb.png" },
+  assetRef: "asset://thumb.png",
+  mtimeMs: Date.now(),
+  workspaceId: "browser-smoke",
+  workspace: "Browser smoke",
+};
+let uploadedAsset = null;
+
 function sendJson(res, value) {
   const body = JSON.stringify(value);
   res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
@@ -53,6 +77,7 @@ const server = createServer(async (req, res) => {
     const html = `<!doctype html><meta charset="utf-8"><title>Canvas browser smoke</title>
       <button id="open-link" data-canvas="audit-sample.canvas.tsx">打开 fixture</button>
       <div id="tail-mount"></div>
+      <div id="library-mount"></div>
       <script src="/assets/preact.umd.js"></script>
       <script src="/assets/preact-hooks.umd.js"></script>
       <script src="/assets/preact-compat.umd.js"></script>
@@ -69,13 +94,16 @@ const server = createServer(async (req, res) => {
         window.__fixturePath=${JSON.stringify(fixturePath)};
         var ctx={
           conversationEvents:{register:function(){return function(){};}},
-          slots:{inject:function(name,fn){if(name==='conversation.chat.turnTail') fn();},register:function(def,component){if(def&&def.name==='conversation.chat.turnTail'){window.__tailSlot={def:def,component:component};}return function(){};}},
+          slots:{inject:function(name,fn){if(name==='conversation.chat.turnTail'||name==='settings.section') fn();},register:function(def,component){if(def&&def.name==='conversation.chat.turnTail'){window.__tailSlot={def:def,component:component};}if(def&&def.name==='settings.section'){window.__settingsSlot={def:def,component:component};}return function(){};}},
           effect:function(fn){var dispose=fn();return dispose;}
         };
         plugin.apply(ctx);
         if(window.__tailSlot){
           var tailPaths=window.__tailSlot.def.select({turn:{data:{get:function(){return {paths:[{path:window.__fixturePath,seq:1}]};}}},seq:1});
           compat.render(compat.createElement(window.__tailSlot.component,{matched:tailPaths}),document.getElementById('tail-mount'));
+        }
+        if(window.__settingsSlot){
+          compat.render(compat.createElement(window.__settingsSlot.component,{}),document.getElementById('library-mount'));
         }
       </script>`;
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -94,6 +122,57 @@ const server = createServer(async (req, res) => {
   }
   if (url.pathname === "/api/canvas/capabilities") {
     sendJson(res, { ok: true, budget: { maxLines: null, maxBytes: null, maxTokens: null, enforce: "soft" } });
+    return;
+  }
+  if (url.pathname === "/api/canvas/list" && req.method === "GET") {
+    sendJson(res, {
+      ok: true,
+      count: 1,
+      truncated: false,
+      items: [libraryItem],
+      workspaces: [{ id: "browser-smoke", label: "Browser smoke" }],
+    });
+    return;
+  }
+  if (url.pathname === "/api/canvas/assets" && req.method === "GET") {
+    sendJson(res, {
+      ok: true,
+      assets: [
+        { name: "thumb.png", bytes: thumbnailBytes.length, href: "asset://thumb.png" },
+        ...(uploadedAsset ? [uploadedAsset] : []),
+      ],
+    });
+    return;
+  }
+  if (url.pathname === "/api/canvas/assets" && req.method === "POST") {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    const request = JSON.parse(body || "{}");
+    if (!request.name || !String(request.data || "").startsWith("data:image/")) {
+      sendJson(res, { ok: false, error: "invalid asset upload" });
+      return;
+    }
+    uploadedAsset = {
+      name: String(request.name),
+      bytes: Buffer.byteLength(String(request.data)),
+      href: `asset://${String(request.name)}`,
+    };
+    sendJson(res, { ok: true, ...uploadedAsset });
+    return;
+  }
+  if (url.pathname === "/api/canvas/assets/raw" && req.method === "GET") {
+    if (url.searchParams.get("name") !== "thumb.png") {
+      res.writeHead(404, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: "asset not found" }));
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "image/png",
+      "content-length": thumbnailBytes.length,
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    });
+    res.end(thumbnailBytes);
     return;
   }
   if (url.pathname === "/api/canvas/sandbox") {
@@ -139,6 +218,34 @@ try {
   if (!tailContract.label || !tailContract.title || !tailContract.focusable || !tailContract.blur.includes("blur")) {
     throw new Error(`chat canvas bubble contract failed: ${JSON.stringify(tailContract)}`);
   }
+  const library = page.locator(".dsh-cv-lib");
+  await library.waitFor({ state: "visible", timeout: 10_000 });
+  const thumbnail = library.locator(".dsh-cv-lib-thumb");
+  await thumbnail.waitFor({ state: "visible", timeout: 10_000 });
+  await page.waitForFunction(() => {
+    const image = document.querySelector(".dsh-cv-lib-thumb");
+    return !!image && image.complete && image.naturalWidth > 0;
+  }, undefined, { timeout: 10_000 });
+  const thumbnailContract = await thumbnail.evaluate((node) => ({
+    src: node.getAttribute("src"),
+    naturalWidth: node.naturalWidth,
+    naturalHeight: node.naturalHeight,
+  }));
+  if (!thumbnailContract.src?.includes("/api/canvas/assets/raw?name=thumb.png") || thumbnailContract.naturalWidth < 1) {
+    throw new Error(`gallery thumbnail contract failed: ${JSON.stringify(thumbnailContract)}`);
+  }
+  await library.locator("input[type=file]").setInputFiles({
+    name: "browser-upload.png",
+    mimeType: "image/png",
+    buffer: thumbnailBytes,
+  });
+  await page.waitForFunction(() => {
+    const node = document.querySelector(".dsh-cv-lib-toast");
+    return !!node && /已上传/.test(node.textContent || "");
+  }, undefined, { timeout: 10_000 });
+  if (!uploadedAsset || !uploadedAsset.name.endsWith(".webp")) {
+    throw new Error(`gallery upload contract failed: ${JSON.stringify(uploadedAsset)}`);
+  }
   await page.locator("#open-link").click();
   const frame = page.locator("iframe");
   try {
@@ -166,7 +273,13 @@ try {
     throw new Error(`sandbox render failed: ${String(error.message || error)}; console=${errors.join(" | ")}`);
   }
   if (errors.length) throw new Error(`browser console errors: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, tail: tailContract, iframe: iframeContract, rendered: true }));
+  console.log(JSON.stringify({
+    ok: true,
+    tail: tailContract,
+    gallery: { thumbnail: thumbnailContract, upload: uploadedAsset },
+    iframe: iframeContract,
+    rendered: true,
+  }));
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
