@@ -122,7 +122,7 @@ const plugin = {
 
 async function exerciseCycle() {
   const fiber = await ctx.plugin(plugin);
-  assert(web.routes.length === 14, `expected 14 routes, got ${web.routes.length}`);
+  assert(web.routes.length === 13, `expected 13 routes, got ${web.routes.length}`);
   assert(tools.tools.length === 1, `expected one tool, got ${tools.tools.length}`);
   assert(systemPrompt.sections.length === 1, "expected one system prompt section");
 
