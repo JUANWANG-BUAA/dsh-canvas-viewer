@@ -38,6 +38,36 @@ if ! dsh plugin --profile web add "file:$DEST"; then
   echo "Inspect the dsh/pnpm error, then retry this command explicitly." >&2
   exit 1
 fi
+
+# pnpm can reuse a same-version local file package even after its checkout
+# changed. Verify the actual profile copy, then use dsh's scoped remove/add
+# fallback only when the first add left stale files behind. No profile JSON or
+# unrelated dependency is edited directly.
+verify_profile_copy() {
+  local installed="$PROFILE/node_modules/$PKG"
+  local file
+  for file in \
+    package.json \
+    lib/index.js \
+    lib/client.js \
+    lib/host/paths.mjs \
+    lib/host/compiler.mjs \
+    lib/host/hot-reload.mjs \
+    lib/host/http.mjs; do
+    [ -f "$installed/$file" ] || return 1
+    cmp -s "$DEST/$file" "$installed/$file" || return 1
+  done
+}
+
+if ! verify_profile_copy; then
+  echo "dsh profile kept a stale same-version local package; refreshing only $PKG via dsh." >&2
+  dsh plugin --profile web remove "$PKG"
+  dsh plugin --profile web add "file:$DEST"
+fi
+if ! verify_profile_copy; then
+  echo "profile refresh failed: $PROFILE/node_modules/$PKG is stale or incomplete." >&2
+  exit 1
+fi
 echo "Synced plugin → $DEST"
 echo "Synced skill  → $SKILL_DEST"
 echo "Restart dsh web to load Host changes."

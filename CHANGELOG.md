@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.4
 
 本轮工程收边界（尚未 bump 版本号）：
 
@@ -8,6 +8,7 @@
 - **生命周期**：插件 fiber 卸载时关闭所有 canvas `fs.watch`、SSE 响应与 debounce 定时器，避免热更新资源跨 reload 泄漏。
 - **安装**：`sync-install.sh` 仅通过 `dsh plugin` 修改 profile，不再自动批准无关构建脚本或手改 `node_modules` fallback；skill 镜像与第三方 notice 纳入同步/打包边界。
 - **发布**：新增 npm 包边界检查与 GitHub Actions CI，锁定必需文件、排除开发产物，并在测试中校验 skill 镜像一致性。
+- **本地开发**：同步脚本校验 profile 的实际安装副本；检测到 pnpm 复用旧的同版本 `file:` 包时，仅通过 dsh 对本插件执行 remove/add 刷新。
 
 ## 0.4.3
 

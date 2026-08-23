@@ -1,6 +1,6 @@
 # Canvas 执行沙箱（SANDBOX）
 
-## 现状（0.4.3 · 第一阶段已落地）
+## 现状（0.4.4 · 第一阶段已落地）
 
 `CanvasMount` 默认在 **`<iframe sandbox="allow-scripts">`**（opaque origin）里渲染 canvas 报告：
 
@@ -29,7 +29,7 @@
 - **装配级 e2e**：`scripts/sandbox-e2e.mjs`（42 断言，无浏览器）校验 SDK 提取、srcdoc 装配（模拟 HTML 分词器计数真实 script 元素）、jsonSafe 防逃逸、Light theme remap、真 eval SDK+编译产物，并在 node:vm 隔离内真实加载三个 Preact UMD + DOM 桩 + 同款 bootstrap 真渲染审计 canvas；已并入 `pnpm test`。
 - **主题切换**：深/浅色（Light 用宿主 `#165dff`），记忆偏好；iframe 内同步（remap 为 `:root[data-dsh-cv-theme=light]`）。
 
-## 已落地（0.4.3）
+## 已落地（0.4.4）
 
 - **体积 — React UMD → Preact 10 + compat**：`assets/` 换成 `preact.umd.js`(11.5 KB)+`preact-hooks.umd.js`(3.8 KB)+`preact-compat.umd.js`(11.3 KB)，合计 ~26 KB（原 React UMD ~142 KB）；srcdoc 现装配 4 个 script，compat 提供 `React`/`ReactDOM` 全局与 `createRoot` 垫片。渲染失败仍回退主线程兼容渲染，风险收敛在沙箱路径。
 - **预算策略可配置**：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`+`budget.enforce`（soft/hard）；浮窗徽标、图库徽标与 `capabilities` 实时读取；hard 下 `view_canvas` 拒绝超限文件。
