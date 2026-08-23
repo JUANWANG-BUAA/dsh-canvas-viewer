@@ -10,7 +10,7 @@ import { previewSignature } from "../lib/preview.mjs";
 import { budgetMessage, budgetStatus, estimateCanvasTokens, normalizeBudget, RECOMMENDED_MAX_BYTES, RECOMMENDED_MAX_LINES, RECOMMENDED_MAX_TOKENS, sourceSignals } from "../lib/host/budget.mjs";
 import { listCanvasAssets, materializeCanvasAssets, saveCanvasAsset } from "../lib/host/assets.mjs";
 import { createHotReloadManager } from "../lib/host/hot-reload.mjs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -44,16 +44,17 @@ assert(saveRejectedTmp, "save must reject /tmp paths");
 {
   const { symlink, unlink, writeFile } = await import("node:fs/promises");
   const link = join(homedir(), ".dsh", "canvases", "z-selftest-outside.canvas.tsx");
+  const outside = join(tmpdir(), `dsh-canvas-viewer-outside-${process.pid}.canvas.tsx`);
   try {
-    await writeFile("/tmp/dsh-canvas-viewer-outside.canvas.tsx", "export default function Outside() { return null; }\n", "utf8");
+    await writeFile(outside, "export default function Outside() { return null; }\n", "utf8");
     await unlink(link).catch(() => {});
-    await symlink("/tmp/dsh-canvas-viewer-outside.canvas.tsx", link);
+    await symlink(outside, link);
     let symlinkRejected = false;
     try { resolveCanvasPath(link); } catch { symlinkRejected = true; }
     assert(symlinkRejected, "absolute symlink outside HOME must be rejected");
   } finally {
     await unlink(link).catch(() => {});
-    await unlink("/tmp/dsh-canvas-viewer-outside.canvas.tsx").catch(() => {});
+    await unlink(outside).catch(() => {});
   }
 }
 ok("resolve guards");
