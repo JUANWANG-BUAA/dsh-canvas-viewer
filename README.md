@@ -1,64 +1,59 @@
 # dsh-canvas-viewer
 
-DeepSeek Harness **Host + Web UI** 插件：把 Cursor 风格的 `.canvas.tsx` 调查/设计报告在 dsh Web 里浮窗打开，并提供设置页「Canvas 图库」。配套 **dsh 自洽** skill `canvas-analysis-report`（不依赖 `~/.cursor/skills-cursor/canvas`）。
+DeepSeek Harness **原生**插件：把 `.canvas.tsx` 调查/设计报告做成 dsh 里的浮窗 + 对话气泡 + 设置图库。**不再依赖 Cursor**：默认写入 `~/.dsh/canvases/`，新报告 import `"dsh/canvas"`，`cursor/canvas` 仅用于兼容旧文件。
 
-定位对照见 [docs/COMPARISON.md](docs/COMPARISON.md)。
+## 核心能力
 
-## 功能
-
-- 工具 **`view_canvas`**：打开 HOME 内 `.canvas.tsx`
-- 短 **system prompt** 段：调查/设计类需求 → 写 canvas → 调 `view_canvas`
-- 浮窗：拖动、Esc 关闭、复制源码、下载
-- 设置 → 插件 → **Canvas 图库**：最近/全部、搜索、复制路径 / Markdown / @引用
-- Skill：路径规则 + **viewer 组件子集**（[skills/.../sdk.md](skills/canvas-analysis-report/sdk.md)）
+- **对话气泡**：模型调用 `view_canvas` 且**注册成功**（文件存在、预算内、HOME 内）后，该轮消息尾部才出现 Canvas 气泡——失败的调用（如占位路径）不弹；点击气泡打开渲染浮窗。
+- **点击打开（克制版）**：只有点击带 `data-canvas`/`data-path` 的元素、真实的 `.canvas.tsx` 链接、或整段文本恰好等于一个 canvas 路径时才打开浮窗；普通提问/正文里顺带提及路径不会误跳，`title` 提示也不会触发。
+- **浮窗查看器**：**多画布 tab**（同时开多张、未保存 ● 标记、单 tab 关闭）、**双击标题栏最大化/还原**、**e/s/se/sw 四向缩放手柄**（宽度持久化）；拖动、Esc 关闭（含沙箱内 Esc 经私有端口转发）、复制源码、下载；渲染 dsh/canvas 子集（Stack/Grid/Table/DAG/图表…）；打开时聚焦、关闭还原焦点（`role=dialog`）。头部带渲染模式/预算状态徽标（沙箱渲染 / 兼容渲染 / 超预算），预算策略可配置（默认 soft 提醒，可切 hard 拦截），底部显示 行数 · 字节 元信息；一键切换深/浅主题（记忆偏好，实时推送到沙箱 iframe，无需重开）。
+- **热更新**：画布打开期间磁盘文件一变（外部编辑/agent 重写），浮窗通过 `GET /api/canvas/watch`（SSE）自动重渲染；文件被删除时提示。
+- **源码分栏 + 保存即重编译**：「源码」按钮切出编辑分栏，`⌘S` 保存（原子写，仅限 `~/.dsh/canvases/`）→ 立即重编译刷新；外部热更新不覆盖未保存的修改。
+- **图表与表格交互**：Bar/Line/Pie 原生 hover tooltip（`<title>`）；`Table sortable` 表头点击排序（数值感知、`aria-sort`）。
+- **iframe 沙箱渲染**：canvas 默认在 `<iframe sandbox="allow-scripts">`（opaque origin）内渲染，并由 srcdoc CSP 禁止网络、worker、form、嵌套 frame 与 object；Preact 10 + compat UMD 内置内联（~26 KB），SDK 由 Host 从运行时提取下发，iframe→宿主消息走 MessageChannel 私有端口。
+- **手机端适配**：窄屏（≤760px）浮窗全屏（无边框/无圆角/隐藏拖拽手柄），图库工具栏换行、搜索占满、按钮加大触控目标；平板宽度不受宿主导航规则干扰。
+- **图表**：Bar/Line 支持 y 轴刻度、网格线、值标签、图例、`referenceLines`、`yMax/yMin/valueSuffix/beginAtZero`；Pie 带图例（值+百分比）；窄窗 Grid 自动收列。
+- **能力协商**：`GET /api/canvas/capabilities` 返回组件/props/限制；不支持的 props（`tooltip`/`stacked`/`doughnut`/`encoding` 等）以 ▤ 降级徽标提示，不再静默丢弃。
+- **设置图库**：设置 → Canvas 图库，浏览/搜索、复制路径 / Markdown / @引用；Hero 区一键深浅主题；列表项带「超预算」警告徽标与**结构缩略卡片**（标题 + 图表/表格/分栏/小节/统计 glyphs + 语气色条，纯源码扫描零执行），迁移过的旧文件显示「自旧版迁移」provenance 徽标（来源/sha256/时间）。
+- **省 token**：system prompt 只挂一小段触发；skill 约 52 行并按需链接 SDK；聊天只需短结论，细节进 canvas；`view_canvas` 回传 `lines`/`bytes`；预算策略可配置：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`（默认 120）+ `budget.enforce`（`soft` 提醒 / `hard` 拒绝），图库徽标与 `capabilities` 实时读取，无需重启宿主。
 
 ## 安装
 
 ```sh
-# GitHub（推荐钉 commit）
 dsh plugin --profile web add github:JUANWANG-BUAA/dsh-canvas-viewer
-
-# 或本地实拷（开发）
+# 或本地开发
 cd ~/code/agent_harness/dsh-canvas-viewer
 pnpm test
-bash scripts/sync-install.sh   # → ~/.dsh/plugins + ~/.dsh/skills
+bash scripts/sync-install.sh
 ```
 
-Skill 也会装到 `~/.dsh/skills/canvas-analysis-report`（`sync-install.sh`）。重启 `dsh web` 并硬刷新浏览器。
-
-```sh
-dsh --profile web --dump-config   # 应出现 # == dsh-canvas-viewer
-```
+重启 `dsh web` 并硬刷新浏览器。
 
 ## 使用
 
 | 入口 | 作用 |
 |---|---|
-| 对话里点 `.canvas.tsx` | 浮窗预览 |
-| `view_canvas` | 同上 |
-| 设置 → 插件 → Canvas 图库 | 浏览 / 复制引用 |
+| 对话里的 Canvas 气泡 | 点击打开浮窗预览 |
+| `view_canvas` | 打开指定 `.canvas.tsx`（回传 lines/bytes） |
+| 设置 → Canvas 图库 | 历史/全部浏览、复制引用 |
 | skill `canvas-analysis-report` | 写报告的方法与子集契约 |
+
+## 原生化约定
+
+- 新文件路径：`~/.dsh/canvases/`
+- 新文件 import：`"dsh/canvas"`
+- 设置图库只索引 `~/.dsh/canvases/`；插件启动时会自动把现存 `~/.cursor/projects/*/canvases` 迁移到 dsh 目录（不覆盖已存在的 dsh 文件）
+- 只读 HOME 内 `.canvas.tsx`，编译结果默认在 opaque-origin iframe 沙箱里执行（`allow-scripts` + srcdoc CSP）；宿主不提供沙箱包时不会自动执行兼容渲染，用户必须显式点击“允许兼容渲染”。
 
 ## 开发
 
 ```sh
-pnpm test              # 路径守卫 + sucrase 编译自检
-node scripts/compile-sample.mjs [path.canvas.tsx]
+pnpm test                 # 语法(2) + 自测(88 断言) + 全量渲染回归(当前存量) + 沙箱装配 e2e(57，含 vm 内真实 Preact 渲染)
+node scripts/self-test.mjs
+node scripts/regression.mjs
+node scripts/sandbox-e2e.mjs
+node scripts/sandbox-harness.mjs   # 需要浏览器时：本地起 iframe 沙箱演示页（开发用）
 bash scripts/sync-install.sh
-```
-
-交付形态遵循 [dsh.pub/develop-plugin.md](https://dsh.pub/develop-plugin.md)：路径 B bundle，UI 只经已验证 slot。
-
-## 安全
-
-只读 HOME 内 `.canvas.tsx`。浏览器对编译结果执行 `new Function`——只打开你信任的文件。
-
-## 卸载
-
-```sh
-dsh plugin --profile web remove dsh-canvas-viewer
-rm -rf ~/.dsh/plugins/dsh-canvas-viewer
-rm -rf ~/.dsh/skills/canvas-analysis-report
 ```
 
 ## License

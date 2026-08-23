@@ -1,6 +1,6 @@
 {
   "name": "dsh-canvas-viewer",
-  "version": "0.1.3",
+  "version": "0.4.3",
   "description": "DeepSeek Harness plugin + dsh-native canvas-analysis-report skill: open .canvas.tsx reports in a floating viewer with a settings library.",
   "type": "module",
   "license": "MIT",
@@ -29,6 +29,8 @@
   "files": [
     "lib/index.js",
     "lib/client.js",
+    "lib/preview.mjs",
+    "assets",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md",
@@ -39,8 +41,11 @@
     "scripts"
   ],
   "scripts": {
-    "test": "node scripts/self-test.mjs",
+    "test": "node scripts/syntax-check.mjs && node scripts/self-test.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
+    "test:sandbox": "node scripts/sandbox-e2e.mjs",
+    "test:syntax": "node scripts/syntax-check.mjs",
     "test:compile": "node scripts/compile-sample.mjs",
+    "test:regression": "node scripts/regression.mjs",
     "open:sample": "node scripts/open-sample.mjs",
     "sync:dsh": "bash scripts/sync-install.sh"
   },
@@ -49,11 +54,7 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-slots"
-      ]
+      "platform": "web"
     }
   },
   "dependencies": {
@@ -61,5 +62,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   }
 }

@@ -1,13 +1,11 @@
 # dsh-canvas-viewer SDK subset
 
-Authoritative for agents writing `.canvas.tsx` files that `dsh-canvas-viewer` can render. Imports use `"cursor/canvas"`; the Host strips them and injects this runtime.
-
-Aligned with Cursor canvas tokens (dark) and a practical subset of primitives — not the full IDE surface.
+Authoritative for agents writing `.canvas.tsx` files for `dsh-canvas-viewer`.
+New files import from `"dsh/canvas"`; the Host accepts `cursor/canvas` only as a legacy shim.
 
 ```ts
 import {
-  Stack, Row, Grid,
-  H1, H2, H3, Text, Pill, Stat,
+  Stack, Row, Grid, H1, H2, H3, Text, Pill, Stat,
   Card, CardHeader, CardBody, Callout, Code, Divider, Spacer,
   Button, Link, Table, TodoList, TodoListCard,
   Swatch, UsageBar, BarChart, LineChart, PieChart, CollapsibleSection,
@@ -15,94 +13,51 @@ import {
   useHostTheme, useCanvasState, useCanvasAction,
   useState, useMemo, useEffect, useRef, useCallback, useId,
   computeDAGLayout, Fragment,
-} from "cursor/canvas";
+} from "dsh/canvas";
 ```
 
-## Theme (`useHostTheme`)
+## Theme
 
-Prefer tokens over hardcoded hex.
+`useHostTheme()`: `kind`, `bg/panel/text/textSecondary/border/accent`, `text.*`, `bg.*`, `stroke.*`, `fill.*`, `category.*`, `palette`. Prefer tokens over hardcoded hex.
 
-```ts
-const theme = useHostTheme();
-theme.kind                 // "dark"
-theme.bg / theme.panel / theme.text / theme.textSecondary / theme.border / theme.accent
-theme.text.primary|secondary|tertiary|quaternary|link
-theme.bg.editor|chrome|elevated
-theme.stroke.primary|secondary|tertiary|focused
-theme.fill.primary|secondary|tertiary|quaternary
-theme.category.blue|green|orange|red|purple|yellow|cyan|pink|gray
-theme.palette              // ordered accent list for charts
-```
+## Layout / type
 
-## Layout
+- `Stack gap` · `Row gap/align/justify/wrap` · `Grid columns/gap/align` (columns auto-clamp on narrow windows)
+- `H1` 24 · `H2` 18 · `H3` 16 · `Text` `tone|size|weight|italic|truncate|as`
+- `Pill active/size/tone` · `Stat value/label/tone` · `Callout tone/title`
+- `Code` · `Button variant` · `Link` · `Divider` · `Spacer` · `mergeStyle`
 
-| Component | Key props |
-|---|---|
-| `Stack` | `gap`, `style` |
-| `Row` | `gap`, `align` (`start`/`center`/`end`/`stretch`), `justify`, `wrap` |
-| `Grid` | `columns` (number or CSS), `gap`, `align` |
-| `Divider` | hairline |
-| `Spacer` | flex spacer (`grow`) |
-| `mergeStyle(base, override)` | shallow merge for small tweaks — no decorative gradients |
+## Cards / lists / tables
 
-## Typography & chrome
+- `Card`, `CardHeader(title,trailing,size,tone)`, `CardBody`
+- `TodoList`, `TodoListCard` (`todos: {id,content,status}`)
+- `Table` props: `headers`, `rows`, `rowTone`, `striped`, `framed`, `stickyHeader`, `columnAlign`, `emptyMessage`, `sortable`, object rows + `columns`; object cells `{href,label}` render links. `sortable` (opt-in) turns headers into click-to-sort toggles (asc → desc → off, numeric-aware compare, zh locale for text, `aria-sort` annotated).
 
-- `H1` 24/30 · `H2` 18/24 · `H3` 16/22 · weight 590
-- `Text` — `tone`: primary/secondary/tertiary/quaternary; `size`: body/small; `weight`; `italic`; `truncate`; `as`
-- `Pill` — `active`/`selected`, `size`: sm, optional `tone`/`color`
-- `Stat` — `value`, `label`, optional `tone`: success/danger/warning/info
-- `Callout` — `tone`: info/warning/danger/success; optional `title`
-- `Code` · `Button` (`variant`: ghost/primary/secondary) · `Link`
+## Charts (supported props)
 
-## Cards & lists
+- `BarChart` / `LineChart`: `series|data`, `categories`, `height`, `width`, `yMin`, `yMax`, `valueSuffix`, `beginAtZero`, `referenceLines: [{value,label}]`, `showValues`, `showLegend`, `style` — renders y-axis gridlines, ticks, value labels, legend (>1 series), reference lines. Hover tooltips are native: bars and line points carry `<title>` (label · series · value).
+- `PieChart`: `data|segments` (`{label,value,color}`), `size`, `valueSuffix`, `style` — renders a legend with values + percentages; slices carry `<title>` hover tooltips (value + percent).
+- `Swatch` · `UsageBar segments` · `CollapsibleSection title/defaultOpen/trailing`
+- Unsupported props (e.g. `stacked`, `doughnut`, `encoding`) are ignored and flagged with a ▤ 降级 badge instead of failing silently.
 
-- `Card` / `CardHeader` (`title`, `trailing`) / `CardBody`
-- `TodoList` / `TodoListCard` — `todos` with `content` + `status`
+## State & interaction
 
-## `Table`
+- `useCanvasState(key, initial)` — key-scoped state: scoped per canvas mount (two canvases using the same key never collide) and per key within one canvas. Returns `[value, setter]`; the setter accepts a value or updater function. No `key` behaves like `useState`.
+- `useCanvasAction()` — returns `dispatch(action)` that fires a real `dsh:canvas:action` window event; the viewer surfaces it as a toast. Reports are read-only, so actions are informational, not file-opening.
 
-```tsx
-<Table
-  headers={["问题", "现状", "影响", "改法"]}
-  rows={[["…", "…", "…", "…"]]}
-  rowTone={["danger", "warning"]}
-  striped
-  columnAlign={["left", "left", "left", "left"]}
-/>
-```
+## Capability negotiation
 
-Also: `framed` (default true), `stickyHeader`, `emptyMessage`, object rows + `columns`.
-
-## Charts & meters
-
-- `Swatch` — `color` category key or hex
-- `UsageBar` — `segments: [{ label, value, color }]`
-- `BarChart` / `LineChart` — `series` or `data`, optional `categories`/`height`/`width`
-- `PieChart` — `data: [{ value, color?, label? }]`
-- `CollapsibleSection` — `title`, `defaultOpen`, `trailing`
-
-Use sparingly; invented metrics are still forbidden by the skill.
+Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits). `view_canvas` returns `lines`/`bytes`; target **≤80 lines** and treat 120 as the ceiling. Prefer a compact table or Stat over another prose block.
 
 ## DAG
 
 ```ts
-const layout = computeDAGLayout({
-  nodes: [{ id: "a" }, { id: "b" }],
-  edges: [{ from: "a", to: "b" }],
-  direction: "vertical",
-});
-// node: { id, x, y, width, height, rank, order }
-// edge: { sourceX/Y, targetX/Y, points: [{x,y}…] }
+const layout = computeDAGLayout({ nodes:[{id}], edges:[{from,to}], direction:"vertical" });
+// nodes: x,y,width,height,rank,order · edges: sourceX/Y,targetX/Y,points
 ```
 
-Draw SVG with `theme.*` fills/strokes. Keep ≤ 8 nodes.
+Draw SVG with `theme.*`. Keep ≤8 nodes.
 
 ## File shape
 
-```tsx
-export default function MyReport() {
-  return <Stack gap={24}>{/* … */}</Stack>;
-}
-```
-
-One default-export function. Embed data inline.
+One default-export function, data inline, imports from `"dsh/canvas"`.
