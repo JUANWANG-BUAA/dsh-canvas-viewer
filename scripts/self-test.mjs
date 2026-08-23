@@ -128,7 +128,7 @@ assert(estimateCanvasTokens("abcd") === 1, "ascii token estimate is stable");
 assert(estimateCanvasTokens("中文") === 2, "non-ascii token estimate is conservative");
 const budget = normalizeBudget({ maxLines: 2, maxBytes: 4, maxTokens: 1, enforce: "hard" });
 const status = budgetStatus({ lines: 3, bytes: 5, estimatedTokens: 2 }, budget);
-assert(status.overBudget && status.violations.join(",") === "lines,bytes,tokens", "budget reports all dimensions");
+assert(status.overBudget && status.overLines && status.overBytes && status.overTokens && status.violations.join(",") === "lines,bytes,tokens", "budget reports all dimensions");
 assert(budgetMessage({ lines: 3, bytes: 5, estimatedTokens: 2 }, budget).includes("tokens"), "budget message explains token overflow");
 ok("budget telemetry");
 

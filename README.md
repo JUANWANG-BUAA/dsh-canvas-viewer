@@ -30,12 +30,27 @@ bash scripts/sync-install.sh
 
 当前版本已在 dsh `0.1.0-rc.6` 的 Web profile 验证；插件集变更后重启 `dsh web`，client 内容变更可由 HMR 更新。
 
+### 可选预算
+
+```json
+{
+  "budget": {
+    "maxLines": 120,
+    "maxBytes": 24000,
+    "maxTokens": 6000,
+    "enforce": "soft"
+  }
+}
+```
+
+`soft` 只在图库、气泡和 `view_canvas` 摘要中标记；改为 `hard` 会拒绝超限的 `view_canvas`。三项都省略时保持历史兼容，不设默认硬上限。
+
 ## 使用
 
 | 入口 | 作用 |
 |---|---|
 | 对话里的 Canvas 气泡 | 点击打开浮窗预览 |
-| `view_canvas` | 打开指定 `.canvas.tsx`（回传 lines/bytes） |
+| `view_canvas` | 打开指定 `.canvas.tsx`（回传 lines/bytes/估算 tokens） |
 | 设置 → Canvas 图库 | 历史/全部浏览、复制引用 |
 | skill `canvas-analysis-report` | 写报告的方法与子集契约 |
 

@@ -83,7 +83,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/canvas/capabilities") {
-    sendJson(res, { ok: true, budget: { maxLines: null, enforce: "soft" } });
+    sendJson(res, { ok: true, budget: { maxLines: null, maxBytes: null, maxTokens: null, enforce: "soft" } });
     return;
   }
   if (url.pathname === "/api/canvas/sandbox") {
