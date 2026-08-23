@@ -43,6 +43,16 @@ pnpm test
 bash scripts/sync-install.sh
 ```
 
+如果 web profile 里还有与本插件无关的 GitHub SSH 依赖，可只为这一次刷新指定传输层，不会改写全局 Git 配置；registry 也可显式指定：
+
+```sh
+DSH_GIT_URL_BASE=https://github.com/ \
+DSH_NPM_REGISTRY=https://registry.npmjs.org \
+bash scripts/sync-install.sh
+```
+
+脚本始终通过 `dsh plugin --profile web add` 修改 profile，绝不会直接覆盖 `node_modules`。刷新前 dsh 可能重新解析 profile 中其它插件；若这些外部依赖不可达，应先修复网络/缓存后重试。
+
 ## 从 skill 到像素的完整链路
 
 ![dsh canvas workflow](docs/assets/workflow.svg)
