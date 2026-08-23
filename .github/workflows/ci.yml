@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prod=false
       - run: pnpm test
 
   browser:
@@ -36,6 +36,6 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prod=false
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:browser
