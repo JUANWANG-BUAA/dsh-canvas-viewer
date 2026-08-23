@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.5
+
+- **Token/体积**：新增 `asset://name.png` 编译期资产引用；报告源码不再携带 base64，Host 只从 `~/.dsh/canvas-assets/` 读取受支持图片并在 sandbox 内安全内联。
+- **安全**：资产路径限制在专用目录、拒绝目录穿越/越界 symlink/不支持类型/超过 2MB 的文件；iframe 网络策略不变。
+- **回归**：资产 mtime 参与编译缓存签名，新增真实 openCanvas 资产编译测试。
+
 ## 0.4.4
 
 本轮工程收边界（尚未 bump 版本号）：

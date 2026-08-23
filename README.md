@@ -10,7 +10,7 @@ DeepSeek Harness **原生**插件：把 `.canvas.tsx` 调查/设计报告做成 
 - **热更新**：画布打开期间磁盘文件一变（外部编辑/agent 重写），浮窗通过 `GET /api/canvas/watch`（SSE）自动重渲染；文件被删除时提示。
 - **源码分栏 + 保存即重编译**：「源码」按钮切出编辑分栏，`⌘S` 保存（原子写，仅限 `~/.dsh/canvases/`）→ 立即重编译刷新；外部热更新不覆盖未保存的修改。
 - **图表与表格交互**：Bar/Line/Pie 原生 hover tooltip（`<title>`）；`Table sortable` 表头点击排序（数值感知、`aria-sort`）。
-- **iframe 沙箱渲染**：canvas 默认在 `<iframe sandbox="allow-scripts">`（opaque origin）内渲染，并由 srcdoc CSP 禁止网络、worker、form、嵌套 frame 与 object；Preact 10 + compat UMD 内置内联（~26 KB），SDK 由 Host 从运行时提取下发，iframe→宿主消息走 MessageChannel 私有端口。
+- **iframe 沙箱渲染**：canvas 默认在 `<iframe sandbox="allow-scripts">`（opaque origin）内渲染，并由 srcdoc CSP 禁止网络、worker、form、嵌套 frame 与 object；Preact 10 + compat UMD 内置内联（~26 KB），SDK 由 Host 从运行时提取下发，iframe→宿主消息走 MessageChannel 私有端口。图片可写成 `asset://foo.png`，Host 从 `~/.dsh/canvas-assets/` 编译期受控内联，避免把 base64 写进报告源码。
 - **手机端适配**：窄屏（≤760px）浮窗全屏（无边框/无圆角/隐藏拖拽手柄），图库工具栏换行、搜索占满、按钮加大触控目标；平板宽度不受宿主导航规则干扰。
 - **图表**：Bar/Line 支持 y 轴刻度、网格线、值标签、图例、`referenceLines`、`yMax/yMin/valueSuffix/beginAtZero`；Pie 带图例（值+百分比）；窄窗 Grid 自动收列。
 - **能力协商**：`GET /api/canvas/capabilities` 返回组件/props/限制；不支持的 props（`tooltip`/`stacked`/`doughnut`/`encoding` 等）以 ▤ 降级徽标提示，不再静默丢弃。
@@ -53,6 +53,8 @@ bash scripts/sync-install.sh
 | `view_canvas` | 打开指定 `.canvas.tsx`（回传 lines/bytes/估算 tokens） |
 | 设置 → Canvas 图库 | 历史/全部浏览、复制引用 |
 | skill `canvas-analysis-report` | 写报告的方法与子集契约 |
+
+图片资产：将 PNG/JPEG/GIF/WebP/AVIF 放入 `~/.dsh/canvas-assets/`，在报告中使用 `<img src="asset://name.png" />`。每个资产上限 2MB；路径不会越过该目录，sandbox 仍不开放网络。
 
 ## 原生化约定
 

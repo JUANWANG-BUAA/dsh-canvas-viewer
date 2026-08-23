@@ -8,6 +8,7 @@
 import { CAPABILITIES, cleanRef, compileCanvas, findCanvasByName, isCanvasPath, locateCompileError, openCanvas, resolveCanvasPath, sandboxBundle, writableCanvasTarget } from "../lib/index.js";
 import { previewSignature } from "../lib/preview.mjs";
 import { budgetMessage, budgetStatus, estimateCanvasTokens, normalizeBudget, RECOMMENDED_MAX_BYTES, RECOMMENDED_MAX_LINES, RECOMMENDED_MAX_TOKENS, sourceSignals } from "../lib/host/budget.mjs";
+import { materializeCanvasAssets } from "../lib/host/assets.mjs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { readFileSync } from "node:fs";
@@ -117,7 +118,7 @@ assert(CAPABILITIES.limits.recommendedMaxBytes === RECOMMENDED_MAX_BYTES, "recom
 assert(CAPABILITIES.limits.recommendedMaxTokens === RECOMMENDED_MAX_TOKENS, "recommended token budget is advertised");
 assert(CAPABILITIES.budget.maxLines === null && CAPABILITIES.budget.maxBytes === null && CAPABILITIES.budget.maxTokens === null, "budgets remain opt-in by default");
 assert(CAPABILITIES.sandbox.level === "iframe-sandbox", "sandbox capability advertised");
-assert(CAPABILITIES.version === "0.4.4", "capabilities version matches package release");
+assert(CAPABILITIES.version === "0.4.5", "capabilities version matches package release");
 assert(CAPABILITIES.sandbox.fallback.includes("fail-closed"), "sandbox fallback is fail-closed");
 assert(readFileSync(new URL("../lib/index.js", import.meta.url), "utf8").includes("hard-budget 拦截"), "hard budget error remains explicit");
 assert(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").includes("允许兼容渲染"), "legacy rendering requires explicit user action");
@@ -133,6 +134,32 @@ assert(budgetMessage({ lines: 3, bytes: 5, estimatedTokens: 2 }, budget).include
 const signals = sourceSignals("const x = 'data:image/png;base64," + "A".repeat(9000) + "';\n" + "const y = 1;\n".repeat(20));
 assert(signals.inlineDataBytes > 8_000 && signals.warnings.includes("inline-data"), "source signals catch inline assets");
 ok("budget telemetry");
+
+// --- source asset references ---
+{
+  const { mkdir, rm, writeFile } = await import("node:fs/promises");
+  const assetDir = join(homedir(), ".dsh", "canvas-assets");
+  const asset = join(assetDir, "z-selftest.png");
+  const canvas = join(homedir(), ".dsh", "canvases", "z-selftest-asset.canvas.tsx");
+  await mkdir(assetDir, { recursive: true });
+  try {
+    await writeFile(asset, "mock-png", "utf8");
+    const materialized = await materializeCanvasAssets('const src = "asset://z-selftest.png";', assetDir);
+    assert(materialized.source.includes("data:image/png;base64,bW9jay1wbmc="), "asset reference materializes as data URI");
+    assert(materialized.signature.includes("z-selftest.png"), "asset mtime participates in compile cache signature");
+    let escaped = false;
+    try { await materializeCanvasAssets('const src = "asset://../secret.png";', assetDir); } catch { escaped = true; }
+    assert(escaped, "asset reference cannot escape managed directory");
+    await writeFile(canvas, 'export default function AssetProbe() { return <img src="asset://z-selftest.png" />; }\n', "utf8");
+    const payload = await openCanvas(canvas);
+    assert(payload.source.includes("asset://z-selftest.png"), "openCanvas preserves compact asset source");
+    assert(payload.compiled.includes("data:image/png;base64,bW9jay1wbmc="), "openCanvas compiles asset into sandbox-safe data URI");
+  } finally {
+    await rm(asset, { force: true });
+    await rm(canvas, { force: true });
+  }
+}
+ok("canvas asset references");
 
 // --- sandbox bundle ---
 const sb = await sandboxBundle();
