@@ -9,6 +9,7 @@ import { CAPABILITIES, cleanRef, compileCanvas, findCanvasByName, isCanvasPath, 
 import { previewSignature } from "../lib/preview.mjs";
 import { budgetMessage, budgetStatus, estimateCanvasTokens, normalizeBudget, RECOMMENDED_MAX_BYTES, RECOMMENDED_MAX_LINES, RECOMMENDED_MAX_TOKENS, sourceSignals } from "../lib/host/budget.mjs";
 import { materializeCanvasAssets } from "../lib/host/assets.mjs";
+import { createHotReloadManager } from "../lib/host/hot-reload.mjs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { readFileSync } from "node:fs";
@@ -161,6 +162,33 @@ ok("budget telemetry");
 }
 ok("canvas asset references");
 
+// --- asset watcher refresh ---
+{
+  const { mkdir, rm, writeFile } = await import("node:fs/promises");
+  const assetDir = join(homedir(), ".dsh", "canvas-assets");
+  const asset = join(assetDir, "z-selftest-watch.png");
+  const writes = [];
+  const client = { write(message) { writes.push(String(message)); } };
+  await mkdir(assetDir, { recursive: true });
+  await writeFile(asset, "before", "utf8");
+  const manager = createHotReloadManager({
+    watchDirs: [assetDir],
+    buildPayload: async () => ({ ok: true, reason: "asset-change" }),
+  });
+  try {
+    manager.open(join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "audit-sample.canvas.tsx"), client);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    await writeFile(asset, "after", "utf8");
+    await new Promise((resolve) => setTimeout(resolve, 420));
+    assert(writes.some((message) => message.includes("asset-change")), "asset changes trigger an open canvas reload");
+  } finally {
+    manager.closeAll();
+    await rm(asset, { force: true });
+  }
+  assert(manager.size() === 0, "asset watcher closes with hot reload manager");
+}
+ok("asset watcher refresh");
+
 // --- sandbox bundle ---
 const sb = await sandboxBundle();
 assert(sb.available === true, "sandbox bundle available");
@@ -228,6 +256,7 @@ assert(hostSrc.includes("let path;") && hostSrc.includes("if (path)"), "hard-bud
 assert(hostSrc.includes("preact.umd.js") && hostSrc.includes("preact-compat"), "host sandbox bundle serves preact-compat");
 assert(clientSrc.includes("window.preactCompat") && clientSrc.includes("ReactDOM.createRoot"), "client srcdoc boots preact compat with createRoot shim");
 assert(hostSrc.includes("hotReload.closeAll();") && hotReloadSrc.includes("function closeAll()"), "plugin disposal closes SSE watchers and clients");
+assert(hostSrc.includes("watchDirs: [DSH_CANVAS_ASSET_DIR]") && hotReloadSrc.includes("ensureDirectoryWatchers"), "asset directory watcher is lifecycle-owned");
 assert(installSrc.includes("verify_profile_copy") && installSrc.includes('dsh plugin --profile web remove "$PKG"'), "local install verifies and refreshes stale same-version packages");
 assert(!installSrc.includes("approve-builds"), "local install never approves unrelated build scripts");
 assert(clientSrc.includes("dsh-cv-lib-row-summary"), "gallery presents one compact structural summary per report");
