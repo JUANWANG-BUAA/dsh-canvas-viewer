@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">dsh-canvas-viewer product preview</title>
+  <desc id="desc">A macOS-inspired Canvas report window beside a conversation bubble and a settings gallery.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1530"/>
+      <stop offset="0.55" stop-color="#172a52"/>
+      <stop offset="1" stop-color="#102443"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#253961"/>
+      <stop offset="1" stop-color="#162746"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6fa7ff"/>
+      <stop offset="1" stop-color="#3979ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#040917" flood-opacity=".5"/>
+    </filter>
+    <marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0 0l7 3.5L0 7z" fill="#79aaff"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="720" rx="32" fill="url(#bg)"/>
+  <circle cx="1130" cy="80" r="180" fill="#4384ff" opacity=".08"/>
+  <circle cx="120" cy="650" r="220" fill="#7a68ff" opacity=".08"/>
+
+  <g filter="url(#shadow)">
+    <rect x="86" y="78" width="818" height="542" rx="18" fill="#0d1428" stroke="#5c76a8" stroke-opacity=".5"/>
+    <rect x="86" y="78" width="818" height="58" rx="18" fill="#1d2a49"/>
+    <rect x="86" y="118" width="818" height="18" fill="#1d2a49"/>
+    <circle cx="116" cy="107" r="7" fill="#ff5f57"/>
+    <circle cx="140" cy="107" r="7" fill="#febc2e"/>
+    <circle cx="164" cy="107" r="7" fill="#28c840"/>
+    <text x="198" y="103" fill="#f4f7ff" font-size="15" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="600">architecture-review</text>
+    <text x="198" y="121" fill="#97a9cc" font-size="11" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">~/ .dsh / canvases / architecture-review.canvas.tsx</text>
+    <rect x="728" y="94" width="76" height="25" rx="12" fill="#20365e" stroke="#5277bd"/>
+    <text x="766" y="111" text-anchor="middle" fill="#a9c8ff" font-size="11" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">沙箱渲染</text>
+    <rect x="814" y="94" width="60" height="25" rx="12" fill="#20365e"/>
+    <text x="844" y="111" text-anchor="middle" fill="#d4def3" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">◐</text>
+
+    <rect x="116" y="166" width="758" height="100" rx="14" fill="url(#card)" stroke="#45628f" stroke-opacity=".6"/>
+    <text x="144" y="201" fill="#eef4ff" font-size="24" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="700">Canvas report, without the detour</text>
+    <text x="144" y="228" fill="#aabbd8" font-size="14" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Compile on the Host · render in an opaque iframe · keep the chat concise</text>
+    <rect x="144" y="242" width="142" height="5" rx="2.5" fill="url(#blue)"/>
+
+    <rect x="116" y="290" width="365" height="286" rx="14" fill="#111d37" stroke="#334e7e"/>
+    <text x="140" y="324" fill="#f0f5ff" font-size="14" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="600">Decision map</text>
+    <text x="140" y="347" fill="#8fa5ca" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">three constraints shape the recommendation</text>
+    <rect x="142" y="378" width="136" height="48" rx="10" fill="#1e3765"/>
+    <text x="210" y="408" text-anchor="middle" fill="#c9ddff" font-size="13" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Evidence</text>
+    <rect x="312" y="378" width="136" height="48" rx="10" fill="#23446b"/>
+    <text x="380" y="408" text-anchor="middle" fill="#c9ddff" font-size="13" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Risk</text>
+    <path d="M278 402h34" stroke="#79aaff" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="227" y="478" width="136" height="48" rx="10" fill="#3979ff"/>
+    <text x="295" y="508" text-anchor="middle" fill="white" font-size="13" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="600">Verdict</text>
+    <path d="M210 426v26l85 24M380 426v26l-85 24" fill="none" stroke="#79aaff" stroke-width="2"/>
+
+    <rect x="505" y="290" width="369" height="286" rx="14" fill="#111d37" stroke="#334e7e"/>
+    <text x="529" y="324" fill="#f0f5ff" font-size="14" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="600">Implementation health</text>
+    <text x="529" y="347" fill="#8fa5ca" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Host · skill · render · browser</text>
+    <rect x="529" y="377" width="311" height="14" rx="7" fill="#243b61"/>
+    <rect x="529" y="377" width="270" height="14" rx="7" fill="#5c9bff"/>
+    <text x="529" y="414" fill="#aec0df" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">trusted local asset pipeline</text>
+    <rect x="529" y="437" width="311" height="14" rx="7" fill="#243b61"/>
+    <rect x="529" y="437" width="237" height="14" rx="7" fill="#6c83ff"/>
+    <text x="529" y="474" fill="#aec0df" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">token-aware report shape</text>
+    <rect x="529" y="497" width="132" height="30" rx="15" fill="#1b385f" stroke="#5f90dc"/>
+    <text x="595" y="517" text-anchor="middle" fill="#cfe0ff" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">browser CI ✓</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="952" y="170" width="250" height="114" rx="18" fill="#f7faff"/>
+    <circle cx="986" cy="207" r="18" fill="#3979ff"/>
+    <text x="986" y="213" text-anchor="middle" fill="white" font-size="18" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">▤</text>
+    <text x="1016" y="205" fill="#1b2740" font-size="14" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="700">architecture-review</text>
+    <text x="1016" y="227" fill="#63728e" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Canvas 报告 · 点击打开</text>
+    <rect x="1016" y="244" width="82" height="24" rx="12" fill="#e8f0ff"/>
+    <text x="1057" y="260" text-anchor="middle" fill="#2f6fe5" font-size="11" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="600">打开</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="948" y="334" width="270" height="195" rx="18" fill="#f7faff"/>
+    <text x="974" y="370" fill="#1b2740" font-size="16" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="700">Canvas 图库</text>
+    <text x="974" y="392" fill="#63728e" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">报告、引用与预览</text>
+    <rect x="974" y="414" width="72" height="52" rx="9" fill="#dbe8ff"/>
+    <path d="M988 452l15-17 12 11 10-8 13 18z" fill="#6f9fff"/>
+    <rect x="1058" y="417" width="126" height="9" rx="4.5" fill="#2b3c5b"/>
+    <rect x="1058" y="435" width="97" height="7" rx="3.5" fill="#9aabc5"/>
+    <rect x="1058" y="450" width="117" height="7" rx="3.5" fill="#d0d9e8"/>
+    <rect x="974" y="486" width="210" height="22" rx="11" fill="#e9f1ff"/>
+    <text x="1079" y="501" text-anchor="middle" fill="#3c70c7" font-size="11" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">asset://diagram.webp · 1.2 MB</text>
+  </g>
+</svg>

@@ -1,6 +1,6 @@
 {
   "name": "dsh-canvas-viewer",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "DeepSeek Harness plugin + dsh-native canvas-analysis-report skill: open .canvas.tsx reports in a floating viewer with a settings library.",
   "type": "module",
   "license": "MIT",
@@ -31,6 +31,8 @@
     "lib/client.js",
     "lib/preview.mjs",
     "lib/host",
+    "src",
+    "tsconfig.json",
     "assets",
     "cordis.patch.yml",
     "README.md",
@@ -44,10 +46,12 @@
     "scripts"
   ],
   "scripts": {
-    "test": "node scripts/sync-skill-mirrors.mjs --check && node scripts/syntax-check.mjs && node scripts/package-contract.mjs && node scripts/client-contract.mjs && node scripts/self-test.mjs && node scripts/budget-report.mjs && node scripts/cordis-lifecycle.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
+    "test": "node scripts/sync-skill-mirrors.mjs --check && pnpm typecheck && node scripts/syntax-check.mjs && node scripts/package-contract.mjs && node scripts/client-contract.mjs && node scripts/self-test.mjs && node scripts/budget-report.mjs && node scripts/cordis-lifecycle.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
     "test:sandbox": "node scripts/sandbox-e2e.mjs",
     "test:lifecycle": "node scripts/cordis-lifecycle.mjs",
     "test:browser": "node scripts/browser-smoke.mjs",
+    "typecheck": "tsc --noEmit",
+    "build:host": "tsc -p tsconfig.json",
     "test:client": "node scripts/client-contract.mjs",
     "test:syntax": "node scripts/syntax-check.mjs",
     "test:compile": "node scripts/compile-sample.mjs",
@@ -73,8 +77,10 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@types/node": "^22.15.0",
     "playwright": "^1.62.1",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "typescript": "^5.8.3"
   }
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.8
+
+- **资产安全与缓存**：上传与读取现在校验真实图片签名、拒绝 URL 编码目录穿越和伪装文件；上传使用随机临时文件 + 原子替换，缩略图响应增加 ETag、nosniff、same-origin 和私有缓存重验证。
+- **渐进式 TypeScript**：新增 `src/host/assets.mts`、严格 `tsconfig.json`、`pnpm typecheck` 与 `pnpm build:host`；提交 `lib/host/assets.mjs` 保持 Git 安装无需执行构建脚本。
+- **文档与展示**：重写中英文 README 的安装/工作流/安全/Token 结构，增加产品示意图、端到端流程图与资产策略文档。
+- **回归**：新增伪装图片、编码路径、ETag 数据契约测试；完整 Host、生命周期、渲染、沙箱和 Playwright 浏览器回归继续通过。
+
 ## 0.4.7
 
 - **图库像素预览**：对源码明确引用的首张 `asset://` 图片增加受限原始资产路由和懒加载真实像素缩略图；不执行整个报告，不改变 iframe 禁网策略。

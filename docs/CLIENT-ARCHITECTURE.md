@@ -19,3 +19,12 @@ This is a build-safe intermediate step: future extraction can move each seam to
 source fragments and concatenate them into the same `client.js` artifact. A
 second runtime loader or direct browser import would violate dsh's external
 factory loading contract.
+
+## Host source/artifact boundary
+
+The security-sensitive asset policy follows the same discipline in reverse:
+[`src/host/assets.mts`](../src/host/assets.mts) is the typed source of truth,
+while [`lib/host/assets.mjs`](../lib/host/assets.mjs) is the committed runtime
+artifact loaded by dsh Git installs. `pnpm typecheck` checks the source and
+`pnpm build:host` regenerates the artifact. Keeping the artifact in Git avoids
+running an install-time build script in a user's profile.

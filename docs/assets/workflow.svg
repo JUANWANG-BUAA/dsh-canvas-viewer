@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" role="img" aria-labelledby="title desc">
+  <title id="title">dsh-canvas-viewer workflow</title>
+  <desc id="desc">The report skill writes a compact Canvas file, the Host validates and compiles it, the client displays it in a bubble and gallery, and the browser sandbox renders it.</desc>
+  <defs>
+    <linearGradient id="line" x1="0" x2="1"><stop stop-color="#4d8cff"/><stop offset="1" stop-color="#8c79ff"/></linearGradient>
+    <filter id="soft" x="-10%" y="-30%" width="120%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#142343" flood-opacity=".15"/></filter>
+  </defs>
+  <rect width="1200" height="260" rx="24" fill="#f7f9fe"/>
+  <path d="M256 130h74M576 130h74M896 130h74" stroke="url(#line)" stroke-width="3" stroke-linecap="round"/>
+  <g filter="url(#soft)">
+    <rect x="40" y="55" width="216" height="150" rx="18" fill="#142346"/>
+    <text x="64" y="92" fill="#8fb8ff" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">01 · SKILL</text>
+    <text x="64" y="124" fill="white" font-size="19" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="700">Compact report</text>
+    <text x="64" y="151" fill="#b4c5e3" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">dsh/canvas + short verdict</text>
+    <text x="64" y="177" fill="#b4c5e3" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">≈ 4k tokens / report</text>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="360" y="55" width="216" height="150" rx="18" fill="#eaf1ff" stroke="#bed2f5"/>
+    <text x="384" y="92" fill="#3a72d9" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">02 · HOST</text>
+    <text x="384" y="124" fill="#1f3154" font-size="19" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="700">Validate + compile</text>
+    <text x="384" y="151" fill="#536b94" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">path · budget · assets</text>
+    <text x="384" y="177" fill="#536b94" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Cordis lifecycle + SSE</text>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="680" y="55" width="216" height="150" rx="18" fill="#f1edff" stroke="#d1c9ff"/>
+    <text x="704" y="92" fill="#6852db" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">03 · CLIENT</text>
+    <text x="704" y="124" fill="#2d2852" font-size="19" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="700">Bubble + gallery</text>
+    <text x="704" y="151" fill="#68608f" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">macOS window · thumbnail</text>
+    <text x="704" y="177" fill="#68608f" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">upload → local Host</text>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="1000" y="55" width="160" height="150" rx="18" fill="#eafbf5" stroke="#b9e9d7"/>
+    <text x="1024" y="92" fill="#168764" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">04 · BROWSER</text>
+    <text x="1024" y="124" fill="#174c3e" font-size="19" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-weight="700">Sandbox</text>
+    <text x="1024" y="151" fill="#4b806f" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">opaque origin</text>
+    <text x="1024" y="177" fill="#4b806f" font-size="12" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">no network</text>
+  </g>
+</svg>

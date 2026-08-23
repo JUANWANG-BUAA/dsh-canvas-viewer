@@ -123,7 +123,7 @@ assert(CAPABILITIES.budget.maxLines === null && CAPABILITIES.budget.maxBytes ===
 assert(CAPABILITIES.sandbox.level === "iframe-sandbox", "sandbox capability advertised");
 assert(CAPABILITIES.assets.upload.includes("/api/canvas/assets"), "asset upload capability advertised");
 assert(CAPABILITIES.assets.preview.includes("/api/canvas/assets/raw"), "asset preview capability advertised");
-assert(CAPABILITIES.version === "0.4.7", "capabilities version matches package release");
+assert(CAPABILITIES.version === "0.4.8", "capabilities version matches package release");
 assert(CAPABILITIES.sandbox.fallback.includes("fail-closed"), "sandbox fallback is fail-closed");
 assert(readFileSync(new URL("../lib/index.js", import.meta.url), "utf8").includes("hard-budget 拦截"), "hard budget error remains explicit");
 assert(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").includes("允许兼容渲染"), "legacy rendering requires explicit user action");
@@ -148,25 +148,34 @@ ok("budget telemetry");
   const canvas = join(homedir(), ".dsh", "canvases", "z-selftest-asset.canvas.tsx");
   await mkdir(assetDir, { recursive: true });
   try {
-    await writeFile(asset, "mock-png", "utf8");
-    const uploaded = await saveCanvasAsset(assetDir, "z-selftest-upload.webp", "data:image/webp;base64,dXBsb2Fk");
-    assert(uploaded.name === "z-selftest-upload.webp" && uploaded.bytes === 6, "asset upload writes bounded base64 data");
+    const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+    await writeFile(asset, tinyPng);
+    const tinyWebp = "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AA/vuUAAA=";
+    const uploaded = await saveCanvasAsset(assetDir, "z-selftest-upload.webp", `data:image/webp;base64,${tinyWebp}`);
+    assert(uploaded.name === "z-selftest-upload.webp" && uploaded.bytes > 0 && uploaded.etag.startsWith('"'), "asset upload writes validated bounded image data");
     assert((await listCanvasAssets(assetDir)).some((row) => row.name === uploaded.name), "asset listing exposes uploaded files");
     const raw = await readCanvasAsset(assetDir, uploaded.name);
-    assert(raw.mime === "image/webp" && raw.data.toString("utf8") === "upload", "asset preview reads only managed image bytes");
+    assert(raw.mime === "image/webp" && raw.data.length === uploaded.bytes && raw.etag === uploaded.etag, "asset preview reads only managed image bytes with a stable validator");
     const materialized = await materializeCanvasAssets('const src = "asset://z-selftest.png";', assetDir);
-    assert(materialized.source.includes("data:image/png;base64,bW9jay1wbmc="), "asset reference materializes as data URI");
+    assert(materialized.source.includes("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="), "asset reference materializes as data URI");
     assert(materialized.signature.includes("z-selftest.png"), "asset mtime participates in compile cache signature");
     let escaped = false;
     try { await materializeCanvasAssets('const src = "asset://../secret.png";', assetDir); } catch { escaped = true; }
     assert(escaped, "asset reference cannot escape managed directory");
+    let encodedEscape = false;
+    try { await readCanvasAsset(assetDir, "%2e%2e%2Fsecret.png"); } catch { encodedEscape = true; }
+    assert(encodedEscape, "encoded asset reference cannot escape managed directory");
+    let spoofed = false;
+    try { await saveCanvasAsset(assetDir, "z-selftest-spoof.png", "data:image/png;base64,bm90LWltYWdl"); } catch { spoofed = true; }
+    assert(spoofed, "asset upload rejects content with a mismatched image signature");
     await writeFile(canvas, 'export default function AssetProbe() { return <img src="asset://z-selftest.png" />; }\n', "utf8");
     const payload = await openCanvas(canvas);
     assert(payload.source.includes("asset://z-selftest.png"), "openCanvas preserves compact asset source");
-    assert(payload.compiled.includes("data:image/png;base64,bW9jay1wbmc="), "openCanvas compiles asset into sandbox-safe data URI");
+    assert(payload.compiled.includes("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="), "openCanvas compiles asset into sandbox-safe data URI");
   } finally {
     await rm(asset, { force: true });
     await rm(join(assetDir, "z-selftest-upload.webp"), { force: true });
+    await rm(join(assetDir, "z-selftest-spoof.png"), { force: true });
     await rm(canvas, { force: true });
   }
 }
@@ -268,7 +277,7 @@ assert(clientSrc.includes("window.preactCompat") && clientSrc.includes("ReactDOM
 assert(hostSrc.includes("hotReload.closeAll();") && hotReloadSrc.includes("function closeAll()"), "plugin disposal closes SSE watchers and clients");
 assert(hostSrc.includes("watchDirs: [DSH_CANVAS_ASSET_DIR]") && hotReloadSrc.includes("ensureDirectoryWatchers"), "asset directory watcher is lifecycle-owned");
 assert(installSrc.includes("verify_profile_copy") && installSrc.includes('dsh plugin --profile web remove "$PKG"'), "local install verifies and refreshes stale same-version packages");
-assert(installSrc.includes("README.en.md") && installSrc.includes("lib/host/assets.mjs"), "local install syncs bilingual docs and asset host module");
+assert(installSrc.includes("README.en.md") && installSrc.includes("lib/host/assets.mjs") && installSrc.includes("src/host/assets.mts") && installSrc.includes("tsconfig.json"), "local install syncs bilingual docs and typed asset source");
 assert(!installSrc.includes("approve-builds"), "local install never approves unrelated build scripts");
 assert(clientSrc.includes("dsh-cv-lib-row-summary"), "gallery presents one compact structural summary per report");
 assert(hostSrc.includes("previewSignature") && hostSrc.includes("readCanvasSource"), "host annotates gallery rows with structural preview");

@@ -18,6 +18,8 @@ const required = [
   "lib/host/hot-reload.mjs",
   "lib/host/budget.mjs",
   "lib/host/assets.mjs",
+  "src/host/assets.mts",
+  "tsconfig.json",
   "cordis.patch.yml",
   "THIRD-PARTY-NOTICES.md",
   "skills/canvas-analysis-report/SKILL.md",

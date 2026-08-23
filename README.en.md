@@ -1,64 +1,137 @@
 # dsh-canvas-viewer
 
+[![CI](https://github.com/JUANWANG-BUAA/dsh-canvas-viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/JUANWANG-BUAA/dsh-canvas-viewer/actions) [![Release](https://img.shields.io/github/v/release/JUANWANG-BUAA/dsh-canvas-viewer?display_name=tag)](https://github.com/JUANWANG-BUAA/dsh-canvas-viewer/releases) [![License](https://img.shields.io/badge/license-MIT-2f6fe5.svg)](LICENSE)
+
 中文：[README.md](README.md)
 
-Native DeepSeek Harness plugin for opening `.canvas.tsx` investigation and design reports in a floating viewer, a conversation tail bubble, and a settings gallery. It uses `dsh/canvas` and stores new reports under `~/.dsh/canvases/`; `cursor/canvas` is accepted only for legacy files.
+Turn investigation, architecture, and design conclusions into real `.canvas.tsx` reports inside DeepSeek Harness: the conversation bubble discovers a report, the macOS-style window lets you read it, the settings gallery manages it, and the sandbox renders it.
 
-## Features
+![dsh-canvas-viewer product preview](docs/assets/hero.svg)
 
-- Successful `view_canvas` calls produce a compact chat bubble; failed or out-of-home calls do not.
-- macOS-style floating window with tabs, source editing, atomic save, drag/maximize, focus restore, light/dark theme, and mobile full-screen layout.
-- Default iframe sandbox (`allow-scripts`, opaque origin) with `connect-src 'none'`, no workers/forms/frames/objects, and private `MessageChannel` action bridging.
-- Blob ES modules load the SDK and compiled report in the default sandbox path, so the default CSP does not need `unsafe-eval`. Main-thread `new Function` exists only behind an explicit compatibility action for degraded environments.
-- Browser-side asset upload resizes images to a 1600px longest edge and compresses them to WebP before sending them to the local host. Assets are stored in `~/.dsh/canvas-assets/`, limited to 2MB each, and referenced as `asset://name.webp`.
-- Structural gallery previews, lazy real-pixel thumbnails for the first referenced `asset://` image, budget telemetry, source-shape warnings, SSE hot reload, and cached gallery metadata keep token and IO costs predictable.
+## The short version
 
-## Install from GitHub
+- **Host + Web UI + dsh skill**: this is a native plugin, not a second Canvas editor.
+- Reports stay in `~/.dsh/canvases/`; images stay in `~/.dsh/canvas-assets/`; the default workflow is local, not a remote CDN.
+- The Host validates paths, budgets, and assets before compiling. The browser renders inside an opaque-origin iframe with network disabled.
+- `asset://diagram.webp` keeps report source compact. The gallery lazy-loads the first referenced image; it does not execute an entire report just to make a thumbnail.
+- The client remains the dsh external factory. The security-sensitive asset boundary is now strict TypeScript source with a committed JavaScript runtime artifact.
 
-Pin a trusted commit instead of a moving branch:
+## Install in one minute
+
+Replace `<40-character-commit-sha>` with a full commit SHA you have reviewed. Pinning a commit keeps a dsh profile reproducible.
 
 ```sh
+# GitHub / community install
 dsh plugin --profile web add github:JUANWANG-BUAA/dsh-canvas-viewer#<40-character-commit-sha>
+
+# Inspect the composed profile
+dsh --profile web --dump-config
+
+# Restart after changing the plugin set; client file edits use dsh Web HMR
+dsh web
 ```
 
-`dsh plugin --profile web add` is the supported GitHub “dsh add” workflow: dsh forwards `add` to the managed profile's package manager, so the profile remains reproducible. Restart `dsh web` after changing the plugin set; client file edits are picked up by the host's stat-poll/SSE HMR.
+The community phrase “`dsh add`” means the `dsh plugin --profile web add` flow above. It is not a separate command that bypasses the profile. See [client architecture](docs/CLIENT-ARCHITECTURE.md) for activation and refresh boundaries.
 
-For local development:
+Local development:
 
 ```sh
-cd ~/code/agent_harness/dsh-canvas-viewer
+git clone https://github.com/JUANWANG-BUAA/dsh-canvas-viewer.git
+cd dsh-canvas-viewer
 pnpm install
 pnpm test
 bash scripts/sync-install.sh
 ```
 
-## Asset references
+## From skill to pixels
 
-Put PNG, JPEG, GIF, WebP, or AVIF files in `~/.dsh/canvas-assets/`, or use the gallery's **Upload image** control. In a report:
+![dsh canvas workflow](docs/assets/workflow.svg)
+
+| Stage | What happens | Boundary |
+| --- | --- | --- |
+| Skill | `canvas-analysis-report` writes a compact, reproducible report | roughly 80 lines / 16KB / 4k estimated tokens |
+| Host | `view_canvas` validates HOME, budgets, compiles, and materializes `asset://` | failed calls never create a chat bubble |
+| Cordis | tools, prompt, routes, and reversible effects are registered | unload removes routes, watchers, SSE, and UI |
+| Client | the external factory injects the bubble, window, and gallery | it is not bundled into the prebuilt shell |
+| Browser | iframe sandbox + CSP + Preact compat render the report | `connect-src 'none'`, no network by default |
+
+## What you get
+
+- **Conversation bubble**: only a successful `view_canvas` call appears; clicking it opens the report.
+- **Viewer window**: multiple tabs, source/render split, atomic save, hot reload, copy/download, theme switching, Esc close, and mobile full-screen mode.
+- **Gallery**: all/recent views, search, workspace filtering, path/Markdown/@ references, real-pixel `asset://` thumbnails, and browser-side WebP upload.
+- **Canvas SDK subset**: Stack, Grid, Table, DAG, Stats, Bar/Line/Pie, Callout, CollapsibleSection, and more; unsupported props show a degraded badge.
+- **Diagnostics**: lines, bytes, estimated tokens, inline-data/repetition warnings, soft/hard budgets, and source-mapped compile errors.
+
+## Local assets, intentionally not a CDN
+
+Images are treated as controlled local dsh data rather than public static content:
 
 ```tsx
 export default function Report() {
-  return <img src="asset://diagram.webp" alt="architecture" />;
+  return <img src="asset://architecture.webp" alt="architecture" />;
 }
 ```
 
-The upload endpoint is local to the dsh web host (`POST /api/canvas/assets`); it is not a remote CDN and does not grant network access to the iframe. Asset paths are single file names and cannot traverse outside the managed directory.
+- The browser scales uploads to a 1600px longest edge and compresses them to WebP. The Host accepts a single filename and a 2MB maximum.
+- The Host validates PNG/JPEG/GIF/WebP/AVIF signatures, rejecting extension-only disguises.
+- `GET /api/canvas/assets/raw` returns an `ETag`; repeated gallery opens can revalidate instead of downloading unchanged pixels. Responses include `nosniff`, same-origin isolation, and private caching.
+- Raw assets never grant the iframe network access; controlled images are inlined at compile time.
+- A remote CDN is deliberately not the default: it adds credentials, lifecycle, CORS, and privacy surfaces and weakens offline reproducibility. Team sharing should be an explicit Host provider with permissions and a remote asset protocol, not arbitrary URLs in reports.
 
-## Trust and token model
+## Token strategy
 
-Canvas files are executable code. Open only trusted `.canvas.tsx` files even though the default iframe is isolated. Keep reports concise (roughly 80 lines, 16KB, and 4k estimated tokens) and use the gallery/`view_canvas` telemetry as a soft signal, not as a billing tokenizer. Inline base64 is discouraged; use `asset://` references.
+The system prompt stays short. Evidence lives in Canvas; chat returns a two-to-four sentence verdict. Tune the recommended policy in `~/.dsh/canvas-viewer/settings.json`:
 
-## Development and verification
+```json
+{
+  "budget": {
+    "maxLines": 120,
+    "maxBytes": 24000,
+    "maxTokens": 6000,
+    "enforce": "soft"
+  }
+}
+```
+
+`soft` annotates; `hard` rejects an over-budget `view_canvas`. Token counts are stable heuristic diagnostics, not billing tokenizer output. Use `asset://` instead of embedding base64 in report source.
+
+## Trust model
+
+Canvas files are executable TSX. The default iframe isolates DOM, network, and the host origin, but it is not a promise that untrusted code becomes safe: open only `.canvas.tsx` files you trust. The compatibility renderer requires an explicit user action and may use `new Function`; keep the default sandbox path when compatibility is not needed.
+
+## Engineering and verification
 
 ```sh
-pnpm test             # mirrors, syntax, host checks, lifecycle, regressions, sandbox e2e
-pnpm test:client      # external factory, module seams, and client size budget
-pnpm test:browser     # Playwright Chromium: chat tail + gallery thumbnail/upload + sandbox iframe
+pnpm typecheck       # strict checks for src/host/*.mts
+pnpm build:host      # generate committed lib/host/*.mjs runtime artifacts
+pnpm test             # skill mirrors, types, Host, client, lifecycle, render, sandbox
+pnpm test:browser    # Playwright: bubble + real gallery thumbnail/upload + iframe
 pnpm audit --prod
 npm pack --dry-run
 ```
 
-The repository intentionally keeps `lib/client.js` as the dsh external factory entrypoint. UI extraction must preserve that runtime contract; source-level modularization is a follow-up build concern, not a reason to ship a second client loader. Gallery thumbnails are deliberately limited to already-uploaded image assets; rendering an entire report per thumbnail remains future work.
+The TypeScript migration is intentionally incremental: the security-sensitive asset boundary moved first, while `lib/host/assets.mjs` remains a directly loadable artifact for dsh Git installs. Future Host modules can follow the same source-to-artifact path without requiring install-time builds.
+
+Repository map:
+
+```text
+lib/index.js                   Host plugin, view_canvas, routes, and prompt
+lib/client.js                  dsh external factory: viewer, bubble, gallery
+src/host/assets.mts            typed asset policy (emits lib/host/assets.mjs)
+skills/canvas-analysis-report/ dsh-native skill and SDK contract
+scripts/                       type, lifecycle, browser, render, and package checks
+docs/                          sandbox, client architecture, assets, and workflow docs
+```
+
+## Known boundaries
+
+- Report-level pixel thumbnails remain deferred; the gallery shows only the first source `asset://` image.
+- Local Host assets are not a CDN; there is no remote team gallery, upload service, or permission sync.
+- `lib/client.js` must remain a single factory entrypoint; UI source extraction must preserve the dsh loading contract.
+- Profile bundle add/remove requires a Web restart; client content changes are served through the Host stat-poll/SSE HMR path.
+
+More detail: [sandbox model](docs/SANDBOX.md) · [client architecture](docs/CLIENT-ARCHITECTURE.md) · [trade-offs](docs/COMPARISON.md) · [changelog](CHANGELOG.md)
 
 ## License
 

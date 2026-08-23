@@ -24,6 +24,7 @@ mkdir -p "$DEST"
 rsync -a \
   --delete \
   --include='lib/***' --include='skills/***' --include='docs/***' --include='assets/***' \
+  --include='src/***' --include='tsconfig.json' \
   --include='package.json' --include='cordis.patch.yml' \
   --include='README.md' --include='AGENTS.md' --include='LICENSE' --include='CHANGELOG.md' \
   --include='README.en.md' \
@@ -56,6 +57,8 @@ verify_profile_copy() {
     lib/host/hot-reload.mjs \
     lib/host/http.mjs \
     lib/host/assets.mjs \
+    src/host/assets.mts \
+    tsconfig.json \
     README.en.md; do
     [ -f "$installed/$file" ] || return 1
     cmp -s "$DEST/$file" "$installed/$file" || return 1

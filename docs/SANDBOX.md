@@ -34,7 +34,7 @@
 
 - **体积 — React UMD → Preact 10 + compat**：`assets/` 换成 `preact.umd.js`(11.5 KB)+`preact-hooks.umd.js`(3.8 KB)+`preact-compat.umd.js`(11.3 KB)，合计 ~26 KB（原 React UMD ~142 KB）；srcdoc 现装配 4 个 script，compat 提供 `React`/`ReactDOM` 全局与 `createRoot` 垫片。渲染失败仍回退主线程兼容渲染，风险收敛在沙箱路径。
 - **模块执行**：Host 同时返回兼容函数体和 `moduleCode`；浏览器默认只使用后者。显式点击「允许兼容渲染」时才会走主线程 `new Function`，这是有意保留的降级边界，不能视为可信执行。
-- **资产上传**：图库在浏览器端将图片缩放到最长边 1600px、以 WebP 质量 0.82 压缩后上传至本机 Host；Host 只接受单层文件名、允许的图片扩展名与 2MB 上限。该接口不是远程 CDN，且不会改变 iframe 的禁网策略。
+- **资产上传**：图库在浏览器端将图片缩放到最长边 1600px、以 WebP 质量 0.82 压缩后上传至本机 Host；Host 只接受单层文件名、允许的图片扩展名、真实文件签名与 2MB 上限，写入采用随机临时文件 + 原子 rename。`/assets/raw` 使用 ETag、`nosniff`、same-origin 与私有缓存重验证。该接口不是远程 CDN，且不会改变 iframe 的禁网策略。完整数据所有权和远程资产取舍见 [ASSETS.md](ASSETS.md)。
 - **预算策略可配置**：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`/`maxBytes`/`maxTokens`+`budget.enforce`（soft/hard）；浮窗徽标、图库徽标与 `capabilities` 实时读取；hard 下 `view_canvas` 拒绝超限文件。默认不设限；建议值是 80 行、16KB、约 4k tokens。估算 token 是启发式诊断；源码扫描还会提示 inline-data 与重复行。
 - **图库结构缩略卡片**：`lib/preview.mjs` 纯源码扫描为每行生成 `preview`（标题/小节/图表/表格/分栏/tone/统计），客户端渲染缩略卡 —— 属「结构签名」，非像素渲染。
 
