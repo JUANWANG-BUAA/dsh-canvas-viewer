@@ -3,7 +3,7 @@
  * Headless sandbox E2E (no browser): verifies the exact iframe-sandbox assembly
  * path used by the live client — SDK extraction, preact UMD trio, srcdoc composition,
  * JSON <script>-closing hardening, MessageChannel init handshake, and a real
- * eval of the SDK + compiled canvas against a React stub. Mirrors SandboxedMount.
+ * module execution of the compiled canvas against a React stub. Mirrors SandboxedMount.
  * Run: node scripts/sandbox-e2e.mjs   (also part of `pnpm test`)
  */
 import fs from "node:fs";
@@ -26,7 +26,7 @@ assert(clientSrc.includes('"dsh:canvas:theme", sendTheme'), "theme toggles are p
 assert(clientSrc.includes('d.type === "dsh-cv:esc"'), "esc pressed inside the sandbox closes the host window");
 assert(clientSrc.includes('new EventSource(API + "/watch'), "viewer subscribes to the hot-reload SSE stream");
 assert(clientSrc.includes("connect-src 'none'") && clientSrc.includes("default-src 'none'"), "srcdoc CSP denies outbound connections by default");
-assert(clientSrc.includes("script-src 'unsafe-inline' 'unsafe-eval'"), "srcdoc CSP documents the required compiled runtime eval");
+assert(clientSrc.includes("script-src 'unsafe-inline' blob:") && !clientSrc.includes("script-src 'unsafe-inline' 'unsafe-eval'"), "sandbox CSP uses Blob ES modules without unsafe-eval");
 assert(clientSrc.includes('API + "/save"'), "viewer saves edited source back to the host");
 assert(clientSrc.includes('"data-split": showSrc ? "1" : "0"'), "source/render split view present");
 assert(clientSrc.includes('"tool/result"') && clientSrc.includes("content[0].isError") && clientSrc.includes("source.callId"), "chat bubble gates on real tool/result message shape");
@@ -65,7 +65,7 @@ const TOKEN_SEL = "[data-dsh-cv-root],[data-dsh-cv-canvas],[data-dsh-cv-lib],[da
 function escAttr(value) {
   return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
-function buildSrcdoc(compiled, sdk, preact, preactHooks, compat, theme) {
+function buildSrcdoc(moduleCode, sdk, preact, preactHooks, compat, theme) {
   const cssStart = clientSrc.indexOf("var css = [");
   const arrEnd = clientSrc.indexOf("].join", cssStart);
   const arrExpr = clientSrc.slice(cssStart + "var css = ".length, arrEnd + 1);
@@ -97,21 +97,21 @@ function buildSrcdoc(compiled, sdk, preact, preactHooks, compat, theme) {
       "function __cvTheme(t){try{if(t==='light'){document.documentElement.setAttribute('data-dsh-cv-theme','light');}else{document.documentElement.removeAttribute('data-dsh-cv-theme');}}catch(e){}}" +
       "window.addEventListener('message',function(ev){var d=ev&&ev.data;if(!d)return;if(d.type==='dsh-cv:init'&&ev.ports&&ev.ports[0]){window.__cvPort=ev.ports[0];__cvTheme(d.theme);}else if(d.type==='dsh-cv:theme'){__cvTheme(d.theme);}},false);" +
       "document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){ev.preventDefault();__send({type:'dsh-cv:esc'});}},false);" +
-      "var __sdkSrc=" + jsonSafe(sdk) + ";" +
-      "var __makeSdk=new Function('ReactLib','h','return (function(){ '+__sdkSrc+';return createSdk(ReactLib); })();');" +
-      "var __sdk=__makeSdk(React,React.createElement);" +
-      "var __compiled=" + jsonSafe(compiled) + ";" +
-      "var __App=new Function('React','sdk',__compiled)(React,__sdk);" +
-      "var __root=ReactDOM.createRoot(document.getElementById('cv-root'));" +
-      "__root.render(React.createElement(__App));" +
+      "function __fail(e){__send({type:'dsh:canvas:error',message:String((e&&e.message)||e||'sandbox module failed')});}" +
+      "function __loadModule(code,done){var u=URL.createObjectURL(new Blob([code],{type:'text/javascript'}));var s=document.createElement('script');s.type='module';s.onload=function(){URL.revokeObjectURL(u);done();};s.onerror=function(){URL.revokeObjectURL(u);__fail(new Error('sandbox module load failed'));};s.src=u;document.head.appendChild(s);}" +
+      "var __sdkSrc=" + jsonSafe(sdk + "\nglobalThis.__cvCreateSdk=createSdk;") + ";" +
+      "var __moduleSrc=" + jsonSafe(moduleCode) + ";" +
+      "__loadModule(__sdkSrc,function(){var __sdk=globalThis.__cvCreateSdk(React,React.createElement);globalThis.sdk=__sdk;globalThis.React=React;globalThis.ReactDOM=ReactDOM;globalThis.h=React.createElement;__loadModule(__moduleSrc,function(){var __App=globalThis.__cvCanvasApp;var __root=ReactDOM.createRoot(document.getElementById('cv-root'));__root.render(React.createElement(__App));});});" +
     "</" + "script>" +
     "</body></html>"
   );
 }
 const auditSource = fs.readFileSync(path.join(root, "fixtures", "audit-sample.canvas.tsx"), "utf8");
-const compiled = (await compileCanvas(auditSource, "audit.canvas.tsx")).code;
-const srcdocDark = buildSrcdoc(compiled, bundle.sdk, bundle.preact, bundle.preactHooks, bundle.compat, "dark");
-const srcdocLight = buildSrcdoc(compiled, bundle.sdk, bundle.preact, bundle.preactHooks, bundle.compat, "light");
+const compiledResult = await compileCanvas(auditSource, "audit.canvas.tsx");
+const compiled = compiledResult.code;
+const moduleCode = compiledResult.moduleCode;
+const srcdocDark = buildSrcdoc(moduleCode, bundle.sdk, bundle.preact, bundle.preactHooks, bundle.compat, "dark");
+const srcdocLight = buildSrcdoc(moduleCode, bundle.sdk, bundle.preact, bundle.preactHooks, bundle.compat, "light");
 // Simulate the HTML tokenizer's script raw-text state: a "<script" inside a
 // script's raw text is NOT a real element open (e.g. react-dom UMD contains the
 // string "<script>\x3c/script>"). Only real elements must balance.
@@ -161,6 +161,7 @@ assert(typeof compat.render === "function", "compat exposes render");
 // --- real headless eval of SDK + compiled against a React stub ---
 const reactStub = {
   createElement: (type, props) => ({ type, props: props || {}, children: [] }),
+  cloneElement: (element, props) => ({ ...element, props: { ...(element && element.props || {}), ...(props || {}) } }),
   useState: () => [], useRef: () => ({}), useMemo: () => null, useCallback: () => () => {},
   useEffect: () => {}, Fragment: "Fragment", version: "stub",
 };
@@ -177,6 +178,7 @@ const App = new Function("React", "sdk", compiled)(reactStub, sdk);
 assert(typeof App === "function", "compiled canvas factory returns a component");
 const tree = App();
 assert(tree && typeof tree === "object", "component renders (element tree)");
+const realSdk = new Function("ReactLib", "h", "return (function(){ " + bundle.sdk + ";return createSdk(ReactLib, h); })();")(compat, compat.createElement);
 
 // --- real Preact render (no browser): a minimal DOM stub is enough for the audit
 // canvas' static tree (divs/spans/svg/text). This exercises the ACTUAL vendored
@@ -235,14 +237,20 @@ assert(tree && typeof tree === "object", "component renders (element tree)");
       const n = mkNode("#text"); n.nodeType = 3; n.nodeName = "#text"; n._text = String(t); n.nodeValue = String(t); return n;
     },
   };
+  // The VM path mirrors the browser's post-Blob-module globals.  Keep the
+  // SDK object in the context (JSON would erase its component functions), then
+  // execute moduleCode as JavaScript so its global export assignment runs.
+  ctx.sdk = realSdk;
+  ctx.React = compat;
+  ctx.ReactDOM = compat;
+  ctx.h = compat.createElement;
   const boot =
     "var React=window.preactCompat;var ReactDOM=window.preactCompat;" +
     "if(!ReactDOM.createRoot){ReactDOM.createRoot=function(c){return {render:function(v){return ReactDOM.render(v,c);}};};}" +
-    "var __sdkSrc=" + jsonSafe(bundle.sdk) + ";" +
-    "var __makeSdk=new Function('ReactLib','h','return (function(){ '+__sdkSrc+';return createSdk(ReactLib); })();');" +
-    "var __sdk=__makeSdk(React,React.createElement);" +
-    "var __compiled=" + jsonSafe(compiled) + ";" +
-    "var __App=new Function('React','sdk',__compiled)(React,__sdk);" +
+    "globalThis.sdk=sdk;globalThis.React=React;globalThis.ReactDOM=ReactDOM;globalThis.h=React.createElement;" +
+    moduleCode +
+    ";" +
+    "var __App=globalThis.__cvCanvasApp;" +
     "var __root=ReactDOM.createRoot(document.getElementById('cv-root'));" +
     "__root.render(React.createElement(__App));";
   try {

@@ -30,6 +30,7 @@ const payload = {
   title: "audit-sample.canvas.tsx",
   source: fixtureSource,
   compiled: compiled.code,
+  moduleCode: compiled.moduleCode,
   sourceMap: compiled.sourceMap,
   mapOffset: compiled.mapOffset,
   error: "",
@@ -137,20 +138,30 @@ try {
   }
   await page.locator("#open-link").click();
   const frame = page.locator("iframe");
-  await frame.waitFor({ state: "attached", timeout: 10_000 });
+  try {
+    await frame.waitFor({ state: "attached", timeout: 10_000 });
+  } catch (error) {
+    throw new Error(`sandbox iframe missing: ${String(error.message || error)}; console=${errors.join(" | ")}; body=${(await page.locator("body").innerText()).slice(0, 500)}`);
+  }
   const iframeContract = await frame.evaluate((node) => ({
     sandbox: node.getAttribute("sandbox"),
     hasCsp: node.srcdoc.includes("Content-Security-Policy"),
     deniesNetwork: node.srcdoc.includes("connect-src 'none'"),
-    allowsRuntime: node.srcdoc.includes("script-src 'unsafe-inline' 'unsafe-eval'"),
+    allowsRuntime: node.srcdoc.includes("script-src 'unsafe-inline' blob:"),
+    allowsBlobModules: node.srcdoc.includes("script-src 'unsafe-inline' blob:"),
+    blocksEval: !node.srcdoc.includes("'unsafe-eval'"),
   }));
   if (iframeContract.sandbox !== "allow-scripts") throw new Error("iframe sandbox contract changed");
-  if (!iframeContract.hasCsp || !iframeContract.deniesNetwork || !iframeContract.allowsRuntime) {
+  if (!iframeContract.hasCsp || !iframeContract.deniesNetwork || !iframeContract.allowsBlobModules || !iframeContract.blocksEval) {
     throw new Error(`iframe CSP contract failed: ${JSON.stringify(iframeContract)}`);
   }
   const reportFrame = page.frames().find((candidate) => candidate !== page.mainFrame());
   if (!reportFrame) throw new Error("report iframe frame missing");
-  await reportFrame.getByText("dsh-canvas-viewer 0.4.0 自验收样张").waitFor({ timeout: 10_000 });
+  try {
+    await reportFrame.getByText("dsh-canvas-viewer 0.4.0 自验收样张").waitFor({ timeout: 10_000 });
+  } catch (error) {
+    throw new Error(`sandbox render failed: ${String(error.message || error)}; console=${errors.join(" | ")}`);
+  }
   if (errors.length) throw new Error(`browser console errors: ${errors.join(" | ")}`);
   console.log(JSON.stringify({ ok: true, tail: tailContract, iframe: iframeContract, rendered: true }));
 } finally {

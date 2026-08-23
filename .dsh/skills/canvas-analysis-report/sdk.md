@@ -47,7 +47,7 @@ import {
 
 ## Capability negotiation
 
-Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits). `view_canvas` returns `lines`/`bytes`/estimated tokens. Target **≤80 lines, ≤16KB, ≈≤4k source tokens**; treat 120 as the ceiling. Prefer a compact table or Stat over repeated prose. Images should use `asset://name.png`, not inline base64.
+Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits). `view_canvas` returns `lines`/`bytes`/estimated tokens. Target **≤80 lines, ≤16KB, ≈≤4k source tokens**; treat 120 as the ceiling. Prefer a compact table or Stat over repeated prose. Images should use `asset://name.webp` (gallery upload resizes to WebP), not inline base64. Reports remain executable and must be trusted, even though the default iframe module path does not require `unsafe-eval`.
 
 ## DAG
 

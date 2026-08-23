@@ -1,5 +1,7 @@
 # dsh-canvas-viewer
 
+English: [README.en.md](README.en.md)
+
 DeepSeek Harness **原生**插件：把 `.canvas.tsx` 调查/设计报告做成 dsh 里的浮窗 + 对话气泡 + 设置图库。**不再依赖 Cursor**：默认写入 `~/.dsh/canvases/`，新报告 import `"dsh/canvas"`，`cursor/canvas` 仅用于兼容旧文件。
 
 ## 核心能力
@@ -11,6 +13,7 @@ DeepSeek Harness **原生**插件：把 `.canvas.tsx` 调查/设计报告做成 
 - **源码分栏 + 保存即重编译**：「源码」按钮切出编辑分栏，`⌘S` 保存（原子写，仅限 `~/.dsh/canvases/`）→ 立即重编译刷新；外部热更新不覆盖未保存的修改。
 - **图表与表格交互**：Bar/Line/Pie 原生 hover tooltip（`<title>`）；`Table sortable` 表头点击排序（数值感知、`aria-sort`）。
 - **iframe 沙箱渲染**：canvas 默认在 `<iframe sandbox="allow-scripts">`（opaque origin）内渲染，并由 srcdoc CSP 禁止网络、worker、form、嵌套 frame 与 object；Preact 10 + compat UMD 内置内联（~26 KB），SDK 由 Host 从运行时提取下发，iframe→宿主消息走 MessageChannel 私有端口。图片可写成 `asset://foo.png`，Host 从 `~/.dsh/canvas-assets/` 编译期受控内联，避免把 base64 写进报告源码。
+- **本地资产上传**：图库的“上传图片”在浏览器端将图片缩放到最长边 1600px、压缩为 WebP 后发送给本机 Host；Host 只接受单层图片文件名，写入 `~/.dsh/canvas-assets/`，单文件上限 2MB。这里是本地工作流，不是远程 CDN 上传。
 - **手机端适配**：窄屏（≤760px）浮窗全屏（无边框/无圆角/隐藏拖拽手柄），图库工具栏换行、搜索占满、按钮加大触控目标；平板宽度不受宿主导航规则干扰。
 - **图表**：Bar/Line 支持 y 轴刻度、网格线、值标签、图例、`referenceLines`、`yMax/yMin/valueSuffix/beginAtZero`；Pie 带图例（值+百分比）；窄窗 Grid 自动收列。
 - **能力协商**：`GET /api/canvas/capabilities` 返回组件/props/限制；不支持的 props（`tooltip`/`stacked`/`doughnut`/`encoding` 等）以 ▤ 降级徽标提示，不再静默丢弃。
@@ -20,7 +23,8 @@ DeepSeek Harness **原生**插件：把 `.canvas.tsx` 调查/设计报告做成 
 ## 安装
 
 ```sh
-# 发布安装请替换为可信发布 commit 的 40 位 SHA；不要依赖会漂移的默认分支。
+# GitHub 安装：dsh plugin 会把 add 转发为 profile 内的 pnpm add。
+# 请替换为可信发布 commit 的 40 位 SHA；不要依赖会漂移的默认分支。
 dsh plugin --profile web add github:JUANWANG-BUAA/dsh-canvas-viewer#<40-character-commit-sha>
 # 或本地开发
 cd ~/code/agent_harness/dsh-canvas-viewer
@@ -29,6 +33,8 @@ bash scripts/sync-install.sh
 ```
 
 当前版本已在 dsh `0.1.0-rc.6` 的 Web profile 验证；插件集变更后重启 `dsh web`，client 内容变更可由 HMR 更新。
+
+> `dsh add` 不是独立的顶层命令；社区文档中的 GitHub “dsh add” 指上面的 `dsh plugin --profile web add …`，它会走 dsh 管理的 profile，避免手改 `node_modules`。
 
 ### 可选预算
 
@@ -54,7 +60,7 @@ bash scripts/sync-install.sh
 | 设置 → Canvas 图库 | 历史/全部浏览、复制引用 |
 | skill `canvas-analysis-report` | 写报告的方法与子集契约 |
 
-图片资产：将 PNG/JPEG/GIF/WebP/AVIF 放入 `~/.dsh/canvas-assets/`，在报告中使用 `<img src="asset://name.png" />`。每个资产上限 2MB；路径不会越过该目录，sandbox 仍不开放网络。
+图片资产：将 PNG/JPEG/GIF/WebP/AVIF 放入 `~/.dsh/canvas-assets/`，或在图库使用“上传图片”（会生成 WebP），在报告中使用 `<img src="asset://name.webp" />`。每个资产上限 2MB；路径不会越过该目录，sandbox 仍不开放网络。
 
 ## 原生化约定
 

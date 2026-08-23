@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.6
+
+- **沙箱安全**：默认 iframe CSP 改用 Blob ES modules 装载 SDK/报告，不再依赖 `unsafe-eval`；主线程 `new Function` 仅保留为用户明确点击后的兼容降级。
+- **资产工作流**：图库新增浏览器端缩放/WebP 压缩上传；Host 提供受限的 `/api/canvas/assets` 列表与写入接口，资产仍只落在 `~/.dsh/canvas-assets/`，上限 2MB。
+- **回归与文档**：sandbox e2e、浏览器 smoke 覆盖无 `unsafe-eval` 合同；补充中英文 README、发布安装说明与可信文件模型。
+
 ## 0.4.5
 
 - **Token/体积**：新增 `asset://name.png` 编译期资产引用；报告源码不再携带 base64，Host 只从 `~/.dsh/canvas-assets/` 读取受支持图片并在 sandbox 内安全内联。

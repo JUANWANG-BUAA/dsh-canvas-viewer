@@ -13,8 +13,9 @@ description: >-
 1. Establish evidence, then write `~/.dsh/canvases/<kebab>.canvas.tsx`.
 2. Import only from `"dsh/canvas"`; new files never use Cursor paths.
 3. Target **≤80 lines, ≤16KB, roughly ≤4k source tokens**; 120 is a hard ceiling, not a target. Lines are a soft density signal, not a reason to delete necessary evidence. Avoid inline base64/data-URI assets.
-4. For images, prefer `<img src="asset://name.png" />`; assets are read from `~/.dsh/canvas-assets/` and materialized before sandbox execution.
-5. Call **`view_canvas`** with the absolute path; chat gives a 2–4 sentence verdict and link, never duplicates the report.
+4. For images, prefer `<img src="asset://name.webp" />`; upload through the gallery when convenient (browser resize/WebP compression), or place trusted PNG/JPEG/GIF/WebP/AVIF files in `~/.dsh/canvas-assets/`. Host materializes them before sandbox execution; never paste base64 into the report.
+5. Treat every report as trusted executable code. The default iframe avoids `unsafe-eval`, but the explicit compatibility fallback can execute on the main thread.
+6. Call **`view_canvas`** with the absolute path; chat gives a 2–4 sentence verdict and link, never duplicates the report.
 
 ## Page skeleton
 
