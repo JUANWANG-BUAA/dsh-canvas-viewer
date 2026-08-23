@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.10
+
+- **刷新传输层**：本地同步使用保留用户 Git helpers/proxies 的进程级临时配置，确保嵌套 pnpm Git clone 也能应用 `DSH_GIT_URL_BASE`；新增显式 `DSH_PNPM_NO_OPTIONAL=1` 以跳过当前平台不需要的 profile 可选包。
+- **安全边界**：刷新仍只通过 dsh profile 命令完成，不会直接覆盖 profile 的 `node_modules`，临时配置退出即清理。
+- **验证**：Host、生命周期、沙箱、渲染、浏览器 CI 与打包检查通过。
+
 ## 0.4.9
 
 - **本地刷新可靠性**：`scripts/sync-install.sh` 增加进程级 `DSH_GIT_URL_BASE` 与 `DSH_NPM_REGISTRY` 传输覆盖，处理 profile 中无关 Git/npm 依赖的网络差异；不修改全局 Git 配置，也不直接覆盖 profile 的 `node_modules`。

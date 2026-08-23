@@ -14,17 +14,28 @@ PKG="dsh-canvas-viewer"
 # configuration or the profile manifest:
 #   DSH_GIT_URL_BASE=https://github.com/  # rewrite GitHub SSH URLs once
 #   DSH_NPM_REGISTRY=https://registry.npmjs.org
+#   DSH_PNPM_NO_OPTIONAL=1               # skip unrelated platform optionals
+GIT_CONFIG_TMP=""
+cleanup_transport_overrides() {
+  if [ -n "$GIT_CONFIG_TMP" ] && [ -f "$GIT_CONFIG_TMP" ]; then
+    rm -f "$GIT_CONFIG_TMP"
+  fi
+}
+trap cleanup_transport_overrides EXIT
+
 if [ -n "${DSH_GIT_URL_BASE:-}" ]; then
+  GIT_CONFIG_TMP="$(mktemp "${TMPDIR:-/tmp}/dsh-canvas-git.XXXXXX")"
+  # Keep the user's existing helpers/proxies, then add only the requested
+  # rewrite. pnpm may sanitize GIT_CONFIG_COUNT, so a scoped global file is
+  # more reliable for nested git clones.
+  if [ -f "${HOME}/.gitconfig" ]; then
+    cp "${HOME}/.gitconfig" "$GIT_CONFIG_TMP"
+  fi
   GIT_BASE="${DSH_GIT_URL_BASE%/}/"
-  # GIT_CONFIG_COUNT augments the user's config for this process; unlike a
-  # temporary GIT_CONFIG_GLOBAL file it does not hide credentials or proxies.
-  export GIT_CONFIG_COUNT=3
-  export GIT_CONFIG_KEY_0="url.$GIT_BASE.insteadOf"
-  export GIT_CONFIG_VALUE_0="git@github.com:"
-  export GIT_CONFIG_KEY_1="url.$GIT_BASE.insteadOf"
-  export GIT_CONFIG_VALUE_1="ssh://git@github.com/"
-  export GIT_CONFIG_KEY_2="url.$GIT_BASE.insteadOf"
-  export GIT_CONFIG_VALUE_2="git+ssh://git@github.com/"
+  git config --file "$GIT_CONFIG_TMP" --add url."$GIT_BASE".insteadOf "git@github.com:"
+  git config --file "$GIT_CONFIG_TMP" --add url."$GIT_BASE".insteadOf "ssh://git@github.com/"
+  git config --file "$GIT_CONFIG_TMP" --add url."$GIT_BASE".insteadOf "git+ssh://git@github.com/"
+  export GIT_CONFIG_GLOBAL="$GIT_CONFIG_TMP"
   echo "Using process-scoped Git transport override: $DSH_GIT_URL_BASE" >&2
 fi
 
@@ -32,6 +43,10 @@ PNPM_ADD_ARGS=()
 if [ -n "${DSH_NPM_REGISTRY:-}" ]; then
   PNPM_ADD_ARGS+=(--registry="$DSH_NPM_REGISTRY")
   echo "Using npm registry override: $DSH_NPM_REGISTRY" >&2
+fi
+if [ "${DSH_PNPM_NO_OPTIONAL:-}" = "1" ]; then
+  PNPM_ADD_ARGS+=(--no-optional)
+  echo "Skipping optional profile packages for this refresh" >&2
 fi
 
 if ! command -v dsh >/dev/null 2>&1; then

@@ -48,10 +48,11 @@ bash scripts/sync-install.sh
 ```sh
 DSH_GIT_URL_BASE=https://github.com/ \
 DSH_NPM_REGISTRY=https://registry.npmjs.org \
+DSH_PNPM_NO_OPTIONAL=1 \
 bash scripts/sync-install.sh
 ```
 
-脚本始终通过 `dsh plugin --profile web add` 修改 profile，绝不会直接覆盖 `node_modules`。刷新前 dsh 可能重新解析 profile 中其它插件；若这些外部依赖不可达，应先修复网络/缓存后重试。
+`DSH_PNPM_NO_OPTIONAL=1` 只适合确认当前平台不需要 profile 中其它平台的可选包时使用。脚本始终通过 `dsh plugin --profile web add` 修改 profile，绝不会直接覆盖 `node_modules`。刷新前 dsh 可能重新解析 profile 中其它插件；若这些外部依赖不可达，应先修复网络/缓存后重试。
 
 ## 从 skill 到像素的完整链路
 

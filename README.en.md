@@ -48,10 +48,11 @@ If the web profile also contains unrelated GitHub SSH dependencies, scope a tran
 ```sh
 DSH_GIT_URL_BASE=https://github.com/ \
 DSH_NPM_REGISTRY=https://registry.npmjs.org \
+DSH_PNPM_NO_OPTIONAL=1 \
 bash scripts/sync-install.sh
 ```
 
-The script always mutates the profile through `dsh plugin --profile web add`; it never overwrites `node_modules` directly. dsh may re-resolve unrelated profile plugins during refresh, so fix network/cache access and retry if one of those external dependencies is unreachable.
+Use `DSH_PNPM_NO_OPTIONAL=1` only when the current platform does not need the profile's unrelated optional packages. The script always mutates the profile through `dsh plugin --profile web add`; it never overwrites `node_modules` directly. dsh may re-resolve unrelated profile plugins during refresh, so fix network/cache access and retry if one of those external dependencies is unreachable.
 
 ## From skill to pixels
 
