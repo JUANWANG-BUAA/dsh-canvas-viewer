@@ -34,6 +34,7 @@
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md",
+    "THIRD-PARTY-NOTICES.md",
     "LICENSE",
     "AGENTS.md",
     "docs",
@@ -41,12 +42,13 @@
     "scripts"
   ],
   "scripts": {
-    "test": "node scripts/syntax-check.mjs && node scripts/self-test.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
+    "test": "node scripts/sync-skill-mirrors.mjs --check && node scripts/syntax-check.mjs && node scripts/self-test.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
     "test:sandbox": "node scripts/sandbox-e2e.mjs",
     "test:syntax": "node scripts/syntax-check.mjs",
     "test:compile": "node scripts/compile-sample.mjs",
     "test:regression": "node scripts/regression.mjs",
     "open:sample": "node scripts/open-sample.mjs",
+    "sync:skills": "node scripts/sync-skill-mirrors.mjs",
     "sync:dsh": "bash scripts/sync-install.sh"
   },
   "dsh": {

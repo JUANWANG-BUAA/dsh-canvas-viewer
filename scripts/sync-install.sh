@@ -18,6 +18,7 @@ if [ ! -d "$PROFILE" ]; then
   echo "Create it with dsh --profile web --dump-config, then retry." >&2
   exit 1
 fi
+node "$ROOT/scripts/sync-skill-mirrors.mjs" --check
 
 mkdir -p "$DEST"
 rsync -a \
@@ -25,6 +26,7 @@ rsync -a \
   --include='lib/***' --include='skills/***' --include='docs/***' --include='assets/***' \
   --include='package.json' --include='cordis.patch.yml' \
   --include='README.md' --include='AGENTS.md' --include='LICENSE' --include='CHANGELOG.md' \
+  --include='THIRD-PARTY-NOTICES.md' \
   --exclude='*' \
   "$ROOT/" "$DEST/"
 

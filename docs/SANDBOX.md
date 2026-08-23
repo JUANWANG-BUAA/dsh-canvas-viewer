@@ -1,6 +1,6 @@
 # Canvas 执行沙箱（SANDBOX）
 
-## 现状（0.3.0 · 第一阶段已落地）
+## 现状（0.4.3 · 第一阶段已落地）
 
 `CanvasMount` 默认在 **`<iframe sandbox="allow-scripts">`**（opaque origin）里渲染 canvas 报告：
 
@@ -8,7 +8,7 @@
 - **Preact 内联**：Preact 10 + compat UMD（`assets/preact*.umd.js`，~26 KB 合计，随插件分发）内联进 srcdoc，`React.createElement`/hooks/`ReactDOM.render` 由 compat 提供（附 `createRoot` 垫片），交互（tab/按钮/useCanvasState）在 iframe 内原生工作。
 - **SDK 同源**：SDK 源码由 Host 从 `lib/client.js` 用与回归测试相同的锚点提取（`gapStyle` → `createSdk` 结尾），经 `GET /api/canvas/sandbox` 下发，iframe 内重建 —— 永远与运行时/回归镜像同一份。
 - **桥接**：`useCanvasAction` 在 iframe 内 `postMessage` 回宿主，宿主窗口重发 `dsh:canvas:action` 事件由浮窗 toast 承接。
-- **降级**：sandbox bundle（UMD assets 或 client.js 缺失）不可用时自动回退到主线程 `new Function`（兼容渲染），不破坏现有能力。
+- **降级**：sandbox bundle（UMD assets 或 client.js 缺失）不可用时显示明确按钮；只有用户显式点击“允许兼容渲染”才回到主线程 `new Function`。
 
 ## 信任模型
 
@@ -25,11 +25,11 @@
 ## 已落地（0.3.0）
 
 - **MessageChannel 握手**：iframe→宿主消息经私有端口传输，宿主只信端口（opaque origin 无法做 origin 比对，端口即身份），窗口 message 仅作 source 校验兜底。
-- **降级可观测性**：浮窗头部徽标显示「沙箱渲染/兼容渲染」，超 120 行另有警告徽标；底部元信息条显示行数/字节。
+- **降级可观测性**：浮窗头部徽标显示「沙箱渲染/兼容渲染」；预算策略由 settings.json 控制，默认不强制。
 - **装配级 e2e**：`scripts/sandbox-e2e.mjs`（42 断言，无浏览器）校验 SDK 提取、srcdoc 装配（模拟 HTML 分词器计数真实 script 元素）、jsonSafe 防逃逸、Light theme remap、真 eval SDK+编译产物，并在 node:vm 隔离内真实加载三个 Preact UMD + DOM 桩 + 同款 bootstrap 真渲染审计 canvas；已并入 `pnpm test`。
 - **主题切换**：深/浅色（Light 用宿主 `#165dff`），记忆偏好；iframe 内同步（remap 为 `:root[data-dsh-cv-theme=light]`）。
 
-## 已落地（0.4.0）
+## 已落地（0.4.3）
 
 - **体积 — React UMD → Preact 10 + compat**：`assets/` 换成 `preact.umd.js`(11.5 KB)+`preact-hooks.umd.js`(3.8 KB)+`preact-compat.umd.js`(11.3 KB)，合计 ~26 KB（原 React UMD ~142 KB）；srcdoc 现装配 4 个 script，compat 提供 `React`/`ReactDOM` 全局与 `createRoot` 垫片。渲染失败仍回退主线程兼容渲染，风险收敛在沙箱路径。
 - **预算策略可配置**：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`+`budget.enforce`（soft/hard）；浮窗徽标、图库徽标与 `capabilities` 实时读取；hard 下 `view_canvas` 拒绝超限文件。
@@ -38,4 +38,4 @@
 ## 待续（后续轮次）
 
 1. **像素级图库缩略图**：结构签名已落地；如需真实渲染缩略图需在客户端离屏沙箱渲染（成本高），暂不做 CI。
-2. 浏览器端 iframe **交互回归**（真实点击/tab/action 桥）：由 `scripts/sandbox-harness.mjs` 手动演示页 + Playwright 实机验证覆盖，未做成 CI 步骤（需要浏览器依赖）。
+2. 浏览器端 iframe **交互回归**（真实点击/tab/action 桥）：由 `scripts/sandbox-harness.mjs` 手动演示页 + Playwright 实机验证覆盖；下一阶段将其纳入 CI 或可复现的 smoke job。

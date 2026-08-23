@@ -7,3 +7,7 @@ node_modules/
 coverage/
 .idea/
 .vscode/
+.learnings/
+.playwright-cli/
+.zcode/
+output/

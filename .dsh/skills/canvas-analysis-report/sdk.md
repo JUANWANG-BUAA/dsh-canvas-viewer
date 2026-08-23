@@ -47,7 +47,7 @@ import {
 
 ## Capability negotiation
 
-Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits). `view_canvas` returns `lines`/`bytes`; the skill budget is **≤120 lines** — keep files tight and never exceed without a reason.
+Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits). `view_canvas` returns `lines`/`bytes`; target **≤80 lines** and treat 120 as the ceiling. Prefer a compact table or Stat over another prose block.
 
 ## DAG
 

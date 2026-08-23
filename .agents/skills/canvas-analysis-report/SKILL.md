@@ -10,11 +10,10 @@ description: >-
 
 ## Flow
 
-1. Research until claims are evidence-backed.
-2. Write `~/.dsh/canvases/<kebab>.canvas.tsx` (no Cursor paths).
-3. Import **only** from `"dsh/canvas"` (subset below; `cursor/canvas` is legacy-compatible, never write new).
-4. Call tool **`view_canvas`** with the absolute path.
-5. Chat: 2–4 sentence verdict + markdown link; do not duplicate tables.
+1. Establish evidence, then write `~/.dsh/canvases/<kebab>.canvas.tsx`.
+2. Import only from `"dsh/canvas"`; new files never use Cursor paths.
+3. Default to **≤80 lines**; 120 is a hard ceiling, not a target.
+4. Call **`view_canvas`** with the absolute path; chat gives a 2–4 sentence verdict and link, never duplicates the report.
 
 ## Page skeleton
 
@@ -23,17 +22,17 @@ Stack(gap=24)
   Pill + tertiary source line
   H1 = sentence verdict
   Callout (the misread)
-  Grid of 3–4 countable Stats
-  Pill tabs (4–6)
+  Grid of 2–4 countable Stats
+  Pill tabs only when views change the decision
   Tab bodies: H2 + Table / named Cards / one DAG ≤8
   Footer caption: source + limits
 ```
 
 ## Genre A — investigation / audit / optimization
 
-Tabs: 总览 · 质量 · 延迟 · 体验 · 建议顺序.
+Tabs: 总览 · 质量 · 体验 · 建议顺序.
 
-Required: misread `Callout`; P0 `Card`s with file names; evidence `Table`s; roadmap via `TodoListCard` or priority table.
+Required: one misread `Callout`; P0 `Card`s with file names; one evidence `Table`; roadmap via `TodoListCard` or priority table.
 
 ## Genre B — design / architecture
 
@@ -44,9 +43,10 @@ Required: explicit 做/不做 Cards; constraint Stats; `computeDAGLayout` + SVG 
 ## Rules
 
 - Only exports in [sdk.md](sdk.md) are safe; unknown Cursor-only exports break preview.
-- H1 is a sentence. Tabs are user-felt axes, not folders.
+- H1 is a sentence. One section answers one decision; tabs are user-felt axes, not folders.
+- Prefer Stat/Table/DAG to prose. Each normal text block ≤35 words; never restate a title, stat, or table in prose.
 - Color is sparse; no fake charts, invented metrics, gradients, or emoji chrome.
 - Match the user's language.
-- **Token budget: aim ≤120 lines.** Prefer tables/Stats over prose, delete empty tabs, no repeated explanations.
+- **Token budget: aim ≤80 lines.** Prefer tables/Stats/DAG, delete empty tabs and repeated explanations.
 - Chat leads with the answer and links the canvas; never ship only chat or only canvas.
 - If `view_canvas` is missing, still write the file and say the plugin is not mounted.
