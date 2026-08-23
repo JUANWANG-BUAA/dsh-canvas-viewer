@@ -11,7 +11,7 @@ Native DeepSeek Harness plugin for opening `.canvas.tsx` investigation and desig
 - Default iframe sandbox (`allow-scripts`, opaque origin) with `connect-src 'none'`, no workers/forms/frames/objects, and private `MessageChannel` action bridging.
 - Blob ES modules load the SDK and compiled report in the default sandbox path, so the default CSP does not need `unsafe-eval`. Main-thread `new Function` exists only behind an explicit compatibility action for degraded environments.
 - Browser-side asset upload resizes images to a 1600px longest edge and compresses them to WebP before sending them to the local host. Assets are stored in `~/.dsh/canvas-assets/`, limited to 2MB each, and referenced as `asset://name.webp`.
-- Structural gallery previews, budget telemetry, source-shape warnings, SSE hot reload, and cached gallery metadata keep token and IO costs predictable.
+- Structural gallery previews, lazy real-pixel thumbnails for the first referenced `asset://` image, budget telemetry, source-shape warnings, SSE hot reload, and cached gallery metadata keep token and IO costs predictable.
 
 ## Install from GitHub
 
@@ -57,7 +57,7 @@ pnpm audit --prod
 npm pack --dry-run
 ```
 
-The repository intentionally keeps `lib/client.js` as the dsh external factory entrypoint. UI extraction must preserve that runtime contract; source-level modularization is a follow-up build concern, not a reason to ship a second client loader. Pixel-perfect gallery thumbnails are opt-in future work because each thumbnail requires an isolated render and cache invalidation; the current gallery uses cheap structural signatures.
+The repository intentionally keeps `lib/client.js` as the dsh external factory entrypoint. UI extraction must preserve that runtime contract; source-level modularization is a follow-up build concern, not a reason to ship a second client loader. Gallery thumbnails are deliberately limited to already-uploaded image assets; rendering an entire report per thumbnail remains future work.
 
 ## License
 

@@ -17,6 +17,9 @@ const fixtureSource = await readFile(fixturePath, "utf8");
 const compiled = await compileCanvas(fixtureSource, fixturePath);
 const bundle = await sandboxBundle();
 const clientSource = await readFile(join(root, "lib", "client.js"), "utf8");
+if (!clientSource.includes("dsh-cv-lib-thumb") || !clientSource.includes("/assets/raw?name=")) {
+  throw new Error("gallery pixel thumbnail contract missing");
+}
 const assets = new Map([
   ["/assets/preact.umd.js", "preact"],
   ["/assets/preact-hooks.umd.js", "preactHooks"],

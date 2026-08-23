@@ -8,7 +8,7 @@
 import { CAPABILITIES, cleanRef, compileCanvas, findCanvasByName, isCanvasPath, locateCompileError, openCanvas, resolveCanvasPath, sandboxBundle, writableCanvasTarget } from "../lib/index.js";
 import { previewSignature } from "../lib/preview.mjs";
 import { budgetMessage, budgetStatus, estimateCanvasTokens, normalizeBudget, RECOMMENDED_MAX_BYTES, RECOMMENDED_MAX_LINES, RECOMMENDED_MAX_TOKENS, sourceSignals } from "../lib/host/budget.mjs";
-import { listCanvasAssets, materializeCanvasAssets, saveCanvasAsset } from "../lib/host/assets.mjs";
+import { listCanvasAssets, materializeCanvasAssets, readCanvasAsset, saveCanvasAsset } from "../lib/host/assets.mjs";
 import { createHotReloadManager } from "../lib/host/hot-reload.mjs";
 import { homedir, tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -122,6 +122,7 @@ assert(CAPABILITIES.limits.recommendedMaxTokens === RECOMMENDED_MAX_TOKENS, "rec
 assert(CAPABILITIES.budget.maxLines === null && CAPABILITIES.budget.maxBytes === null && CAPABILITIES.budget.maxTokens === null, "budgets remain opt-in by default");
 assert(CAPABILITIES.sandbox.level === "iframe-sandbox", "sandbox capability advertised");
 assert(CAPABILITIES.assets.upload.includes("/api/canvas/assets"), "asset upload capability advertised");
+assert(CAPABILITIES.assets.preview.includes("/api/canvas/assets/raw"), "asset preview capability advertised");
 assert(CAPABILITIES.version === "0.4.6", "capabilities version matches package release");
 assert(CAPABILITIES.sandbox.fallback.includes("fail-closed"), "sandbox fallback is fail-closed");
 assert(readFileSync(new URL("../lib/index.js", import.meta.url), "utf8").includes("hard-budget 拦截"), "hard budget error remains explicit");
@@ -151,6 +152,8 @@ ok("budget telemetry");
     const uploaded = await saveCanvasAsset(assetDir, "z-selftest-upload.webp", "data:image/webp;base64,dXBsb2Fk");
     assert(uploaded.name === "z-selftest-upload.webp" && uploaded.bytes === 6, "asset upload writes bounded base64 data");
     assert((await listCanvasAssets(assetDir)).some((row) => row.name === uploaded.name), "asset listing exposes uploaded files");
+    const raw = await readCanvasAsset(assetDir, uploaded.name);
+    assert(raw.mime === "image/webp" && raw.data.toString("utf8") === "upload", "asset preview reads only managed image bytes");
     const materialized = await materializeCanvasAssets('const src = "asset://z-selftest.png";', assetDir);
     assert(materialized.source.includes("data:image/png;base64,bW9jay1wbmc="), "asset reference materializes as data URI");
     assert(materialized.signature.includes("z-selftest.png"), "asset mtime participates in compile cache signature");
