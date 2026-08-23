@@ -48,6 +48,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/") {
     const html = `<!doctype html><meta charset="utf-8"><title>Canvas browser smoke</title>
       <button id="open-link" data-canvas="audit-sample.canvas.tsx">打开 fixture</button>
+      <div id="tail-mount"></div>
       <script src="/assets/preact.umd.js"></script>
       <script src="/assets/preact-hooks.umd.js"></script>
       <script src="/assets/preact-compat.umd.js"></script>
@@ -61,12 +62,17 @@ const server = createServer(async (req, res) => {
           throw new Error('unexpected require: '+id);
         });
         window.__plugin=plugin;
+        window.__fixturePath=${JSON.stringify(fixturePath)};
         var ctx={
           conversationEvents:{register:function(){return function(){};}},
-          slots:{inject:function(){},register:function(){return function(){};}},
+          slots:{inject:function(name,fn){if(name==='conversation.chat.turnTail') fn();},register:function(def,component){if(def&&def.name==='conversation.chat.turnTail'){window.__tailSlot={def:def,component:component};}return function(){};}},
           effect:function(fn){var dispose=fn();return dispose;}
         };
         plugin.apply(ctx);
+        if(window.__tailSlot){
+          var tailPaths=window.__tailSlot.def.select({turn:{data:{get:function(){return {paths:[{path:window.__fixturePath,seq:1}]};}}},seq:1});
+          compat.render(compat.createElement(window.__tailSlot.component,{matched:tailPaths}),document.getElementById('tail-mount'));
+        }
       </script>`;
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(html);
@@ -118,6 +124,17 @@ try {
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(`http://127.0.0.1:${address.port}/`);
+  const tail = page.locator(".dsh-cv-tail");
+  await tail.waitFor({ state: "visible", timeout: 10_000 });
+  const tailContract = await tail.evaluate((node) => ({
+    label: node.querySelector("button")?.getAttribute("aria-label"),
+    title: node.querySelector(".dsh-cv-tail-name")?.textContent,
+    blur: getComputedStyle(node).backdropFilter || getComputedStyle(node).webkitBackdropFilter,
+    focusable: node.querySelector("button")?.getAttribute("type") === "button",
+  }));
+  if (!tailContract.label || !tailContract.title || !tailContract.focusable || !tailContract.blur.includes("blur")) {
+    throw new Error(`chat canvas bubble contract failed: ${JSON.stringify(tailContract)}`);
+  }
   await page.locator("#open-link").click();
   const frame = page.locator("iframe");
   await frame.waitFor({ state: "attached", timeout: 10_000 });
@@ -135,7 +152,7 @@ try {
   if (!reportFrame) throw new Error("report iframe frame missing");
   await reportFrame.getByText("dsh-canvas-viewer 0.4.0 自验收样张").waitFor({ timeout: 10_000 });
   if (errors.length) throw new Error(`browser console errors: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, iframe: iframeContract, rendered: true }));
+  console.log(JSON.stringify({ ok: true, tail: tailContract, iframe: iframeContract, rendered: true }));
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
