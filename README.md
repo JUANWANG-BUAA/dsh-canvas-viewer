@@ -15,7 +15,7 @@ DeepSeek Harness **原生**插件：把 `.canvas.tsx` 调查/设计报告做成 
 - **图表**：Bar/Line 支持 y 轴刻度、网格线、值标签、图例、`referenceLines`、`yMax/yMin/valueSuffix/beginAtZero`；Pie 带图例（值+百分比）；窄窗 Grid 自动收列。
 - **能力协商**：`GET /api/canvas/capabilities` 返回组件/props/限制；不支持的 props（`tooltip`/`stacked`/`doughnut`/`encoding` 等）以 ▤ 降级徽标提示，不再静默丢弃。
 - **设置图库**：设置 → Canvas 图库，浏览/搜索、复制路径 / Markdown / @引用；列表项带结构缩略卡片（纯源码扫描零执行）。迁移过的旧文件保留 provenance 数据供诊断，但不占主列表视觉空间。
-- **省 token**：system prompt 只挂一小段触发；skill 目标 ≤80 行、≤16KB、约 ≤4k tokens，120 行为上限；聊天只需短结论，细节进 canvas；`view_canvas` 回传 `lines`/`bytes`/估算 tokens；预算策略可配置：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`/`maxBytes`/`maxTokens` + `budget.enforce`（`soft` 提醒 / `hard` 拒绝），不配置时不强制上限。避免把图片内联成 base64；估算 token 是启发式信号，不是计费 tokenizer。
+- **省 token**：system prompt 只挂一小段触发；skill 目标 ≤80 行、≤16KB、约 ≤4k tokens，120 行为上限；行数只是软密度信号，不删必要证据；聊天只需短结论，细节进 canvas；`view_canvas` 回传 `lines`/`bytes`/估算 tokens，并识别 inline-data/重复行；预算策略可配置：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`/`maxBytes`/`maxTokens` + `budget.enforce`（`soft` 提醒 / `hard` 拒绝），不配置时不强制上限。避免把图片内联成 base64；估算 token 是启发式信号，不是计费 tokenizer。
 
 ## 安装
 

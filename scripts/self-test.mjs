@@ -7,7 +7,7 @@
  */
 import { CAPABILITIES, cleanRef, compileCanvas, findCanvasByName, isCanvasPath, locateCompileError, openCanvas, resolveCanvasPath, sandboxBundle, writableCanvasTarget } from "../lib/index.js";
 import { previewSignature } from "../lib/preview.mjs";
-import { budgetMessage, budgetStatus, estimateCanvasTokens, normalizeBudget, RECOMMENDED_MAX_BYTES, RECOMMENDED_MAX_LINES, RECOMMENDED_MAX_TOKENS } from "../lib/host/budget.mjs";
+import { budgetMessage, budgetStatus, estimateCanvasTokens, normalizeBudget, RECOMMENDED_MAX_BYTES, RECOMMENDED_MAX_LINES, RECOMMENDED_MAX_TOKENS, sourceSignals } from "../lib/host/budget.mjs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { readFileSync } from "node:fs";
@@ -130,6 +130,8 @@ const budget = normalizeBudget({ maxLines: 2, maxBytes: 4, maxTokens: 1, enforce
 const status = budgetStatus({ lines: 3, bytes: 5, estimatedTokens: 2 }, budget);
 assert(status.overBudget && status.overLines && status.overBytes && status.overTokens && status.violations.join(",") === "lines,bytes,tokens", "budget reports all dimensions");
 assert(budgetMessage({ lines: 3, bytes: 5, estimatedTokens: 2 }, budget).includes("tokens"), "budget message explains token overflow");
+const signals = sourceSignals("const x = 'data:image/png;base64," + "A".repeat(9000) + "';\n" + "const y = 1;\n".repeat(20));
+assert(signals.inlineDataBytes > 8_000 && signals.warnings.includes("inline-data"), "source signals catch inline assets");
 ok("budget telemetry");
 
 // --- sandbox bundle ---
@@ -194,6 +196,7 @@ assert(hostSrc.includes("migrationBy") && hostSrc.includes("row.provenance"), "h
 assert(clientSrc.includes("budgetState") && clientSrc.includes("refreshBudget"), "client reads budget policy from capabilities");
 assert(hostSrc.includes("getBudgetPolicy") && hostSrc.includes('budget.enforce') && hostSrc.includes("hard-budget 拦截"), "host budget policy (unrestricted default, hard opt-in)");
 assert(hostSrc.includes("estimatedTokens") && hostSrc.includes("maxBytes") && hostSrc.includes("maxTokens"), "host exposes byte/token telemetry");
+assert(hostSrc.includes("sourceSignals") && clientSrc.includes("含 "), "source-shape warnings reach the gallery");
 assert(hostSrc.includes("let path;") && hostSrc.includes("if (path)"), "hard-budget rejection is outside the path-resolution catch");
 assert(hostSrc.includes("preact.umd.js") && hostSrc.includes("preact-compat"), "host sandbox bundle serves preact-compat");
 assert(clientSrc.includes("window.preactCompat") && clientSrc.includes("ReactDOM.createRoot"), "client srcdoc boots preact compat with createRoot shim");

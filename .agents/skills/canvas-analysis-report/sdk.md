@@ -47,7 +47,7 @@ import {
 
 ## Capability negotiation
 
-Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits). `view_canvas` returns `lines`/`bytes`; target **≤80 lines** and treat 120 as the ceiling. Prefer a compact table or Stat over another prose block.
+Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits). `view_canvas` returns `lines`/`bytes`/estimated tokens. Target **≤80 lines, ≤16KB, ≈≤4k source tokens**; treat 120 as the ceiling. Prefer a compact table or Stat over repeated prose.
 
 ## DAG
 

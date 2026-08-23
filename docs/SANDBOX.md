@@ -32,7 +32,7 @@
 ## 已落地（0.4.4）
 
 - **体积 — React UMD → Preact 10 + compat**：`assets/` 换成 `preact.umd.js`(11.5 KB)+`preact-hooks.umd.js`(3.8 KB)+`preact-compat.umd.js`(11.3 KB)，合计 ~26 KB（原 React UMD ~142 KB）；srcdoc 现装配 4 个 script，compat 提供 `React`/`ReactDOM` 全局与 `createRoot` 垫片。渲染失败仍回退主线程兼容渲染，风险收敛在沙箱路径。
-- **预算策略可配置**：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`/`maxBytes`/`maxTokens`+`budget.enforce`（soft/hard）；浮窗徽标、图库徽标与 `capabilities` 实时读取；hard 下 `view_canvas` 拒绝超限文件。默认不设限；建议值是 80 行、16KB、约 4k tokens。估算 token 是启发式诊断，base64 图片会显著放大源码成本。
+- **预算策略可配置**：`~/.dsh/canvas-viewer/settings.json` 的 `budget.maxLines`/`maxBytes`/`maxTokens`+`budget.enforce`（soft/hard）；浮窗徽标、图库徽标与 `capabilities` 实时读取；hard 下 `view_canvas` 拒绝超限文件。默认不设限；建议值是 80 行、16KB、约 4k tokens。估算 token 是启发式诊断；源码扫描还会提示 inline-data 与重复行。
 - **图库结构缩略卡片**：`lib/preview.mjs` 纯源码扫描为每行生成 `preview`（标题/小节/图表/表格/分栏/tone/统计），客户端渲染缩略卡 —— 属「结构签名」，非像素渲染。
 
 ## 待续（后续轮次）
