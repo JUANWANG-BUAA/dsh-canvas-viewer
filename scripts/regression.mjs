@@ -28,7 +28,10 @@ function resolveReact() {
     try {
       const path = require("node:path");
       const React = require(path.join(base, "react"));
-      const rds = require(path.join(base, "react-dom/server.node.js")) || require(path.join(base, "react-dom/server"));
+      let rds;
+      try { rds = require(path.join(base, "react-dom/server.node.js")); } catch {
+        rds = require(path.join(base, "react-dom/server"));
+      }
       if (React && rds && rds.renderToStaticMarkup) {
         return { React, renderToStaticMarkup: rds.renderToStaticMarkup };
       }
@@ -177,4 +180,3 @@ const result = {
 };
 console.log(JSON.stringify(result, null, 2));
 process.exit(result.ok ? 0 : 1);
-
