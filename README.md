@@ -15,6 +15,7 @@ English: [README.en.md](README.en.md)
 - Host 先做路径、预算和资产校验，再编译；浏览器默认在 opaque-origin iframe 中渲染，并禁止网络。
 - `asset://diagram.webp` 让源码保持短小，图库只懒加载首张真实像素缩略图，不执行整份报告生成预览。
 - client 仍是 dsh 要求的外部 factory；Host 的安全关键资产模块已迁移为严格 TypeScript 源码并保留可提交运行产物。
+- 已验证与 DeepSeek Harness **0.1.1-rc.2**（npm `latest`/`next`）组合启动，CI 带真实 DSH profile smoke。
 
 ## 一分钟安装
 

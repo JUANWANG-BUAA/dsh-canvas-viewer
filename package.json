@@ -50,6 +50,7 @@
     "test:sandbox": "node scripts/sandbox-e2e.mjs",
     "test:lifecycle": "node scripts/cordis-lifecycle.mjs",
     "test:browser": "node scripts/browser-smoke.mjs",
+    "test:dsh": "node scripts/dsh-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "build:host": "tsc -p tsconfig.json",
     "test:client": "node scripts/client-contract.mjs",

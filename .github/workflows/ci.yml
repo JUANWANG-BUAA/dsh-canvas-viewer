@@ -12,6 +12,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -19,7 +23,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prod=false
       - run: pnpm test
@@ -27,6 +31,10 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -34,8 +42,43 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prod=false
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:browser
+
+  dsh-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prod=false
+      - name: Fetch DeepSeek Harness checkout
+        uses: actions/checkout@v4
+        with:
+          repository: deepseek-ai/deepseek-harness
+          ref: b150a551b8d465e31e418e1b2eaf5e79bbb7d28e
+          path: .harness
+          filter: blob:none
+      - name: Install harness
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+        working-directory: .harness
+      - name: Build harness (lib + web)
+        run: corepack pnpm run build
+        working-directory: .harness
+      - name: Real DSH canvas composition smoke
+        run: node scripts/dsh-smoke.mjs
+        env:
+          HARNESS_DIR: ${{ github.workspace }}/.harness
+          DSH_HOME: ${{ runner.temp }}/dsh-canvas-smoke-home
+          PACK_PLUGIN: 1
