@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.11 (2026-08-24)
+
+- **DSH 兼容追赶**：CI 改为官方支持的 Node 22/24 矩阵，新增真实 DeepSeek Harness 组合 smoke（`scripts/dsh-smoke.mjs`）并接入 CI `dsh-smoke` job，锁定 DSH `0.1.1-rc.2`。
+- **文档**：README/README.en/AGENTS 注明已验证 DSH `0.1.1-rc.2`（npm `latest`/`next`）。
+- **验证**：`pnpm test`、`pnpm test:browser` 与本地 DSH 0.1.1-rc.2 实际启动均通过。
+
 ## 0.4.10
 
 - **刷新传输层**：本地同步使用保留用户 Git helpers/proxies 的进程级临时配置，确保嵌套 pnpm Git clone 也能应用 `DSH_GIT_URL_BASE`；新增显式 `DSH_PNPM_NO_OPTIONAL=1` 以跳过当前平台不需要的 profile 可选包。
