@@ -247,6 +247,8 @@ try {
     throw new Error(`gallery upload contract failed: ${JSON.stringify(uploadedAsset)}`);
   }
   await page.locator("#open-link").click();
+  const viewer = page.locator(".dsh-cv-win");
+  await viewer.waitFor({ state: "visible", timeout: 10_000 });
   const frame = page.locator("iframe");
   try {
     await frame.waitFor({ state: "attached", timeout: 10_000 });
@@ -265,6 +267,30 @@ try {
   if (!iframeContract.hasCsp || !iframeContract.deniesNetwork || !iframeContract.allowsBlobModules || !iframeContract.blocksEval) {
     throw new Error(`iframe CSP contract failed: ${JSON.stringify(iframeContract)}`);
   }
+  const chromeContract = await viewer.evaluate((node) => ({
+    backdrop: getComputedStyle(node).backdropFilter || getComputedStyle(node).webkitBackdropFilter,
+    traffic: node.querySelectorAll(".dsh-cv-traffic-btn").length,
+    toolgroups: node.querySelectorAll(".dsh-cv-toolgroup").length,
+    wrapperPadding: getComputedStyle(node.querySelector(".dsh-cv-sandbox-wrap")).padding,
+    iframeBackground: getComputedStyle(node.querySelector("iframe")).backgroundColor,
+  }));
+  if (chromeContract.backdrop !== "none" || chromeContract.traffic !== 3 || chromeContract.toolgroups !== 2) {
+    throw new Error(`viewer chrome contract failed: ${JSON.stringify(chromeContract)}`);
+  }
+  if (chromeContract.wrapperPadding !== "0px" || !chromeContract.iframeBackground.includes("23, 27, 33")) {
+    throw new Error(`pixel-plane contract failed: ${JSON.stringify(chromeContract)}`);
+  }
+  await viewer.locator(".dsh-cv-traffic-btn[data-kind=minimize]").click();
+  if (await viewer.getAttribute("data-collapsed") !== "1") throw new Error("window collapse control failed");
+  await viewer.locator(".dsh-cv-traffic-btn[data-kind=minimize]").click();
+  await viewer.locator(".dsh-cv-traffic-btn[data-kind=zoom]").click();
+  if (await viewer.getAttribute("data-max") !== "1") throw new Error("window zoom control failed");
+  await viewer.locator(".dsh-cv-traffic-btn[data-kind=zoom]").click();
+  await viewer.getByRole("button", { name: "放大画布" }).click();
+  const canvasScale = await viewer.locator(".dsh-cv-sandbox-wrap").evaluate((node) => getComputedStyle(node).getPropertyValue("--cv-scale").trim());
+  if (canvasScale !== "1.1") throw new Error(`canvas zoom failed: ${canvasScale}`);
+  await viewer.getByRole("button", { name: /当前缩放/ }).click();
+  await viewer.getByRole("button", { name: "切换主题" }).click();
   const reportFrame = page.frames().find((candidate) => candidate !== page.mainFrame());
   if (!reportFrame) throw new Error("report iframe frame missing");
   try {
@@ -272,12 +298,22 @@ try {
   } catch (error) {
     throw new Error(`sandbox render failed: ${String(error.message || error)}; console=${errors.join(" | ")}`);
   }
+  await reportFrame.waitForFunction(() => document.documentElement.getAttribute("data-dsh-cv-theme") === "light", undefined, { timeout: 10_000 });
+  const lightCanvasBase = await reportFrame.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  if (!lightCanvasBase.includes("246, 247, 249")) throw new Error(`light canvas base failed: ${lightCanvasBase}`);
+  await page.evaluate(() => document.body.setAttribute("data-ds-dark-theme", ""));
+  await page.waitForFunction(() => document.documentElement.getAttribute("data-dsh-cv-theme") !== "light", undefined, { timeout: 10_000 });
+  await reportFrame.waitForFunction(() => document.documentElement.getAttribute("data-dsh-cv-theme") !== "light", undefined, { timeout: 10_000 });
+  const hostSyncedCanvasBase = await reportFrame.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  if (!hostSyncedCanvasBase.includes("23, 27, 33")) throw new Error(`host theme sync failed: ${hostSyncedCanvasBase}`);
   if (errors.length) throw new Error(`browser console errors: ${errors.join(" | ")}`);
   console.log(JSON.stringify({
     ok: true,
     tail: tailContract,
     gallery: { thumbnail: thumbnailContract, upload: uploadedAsset },
     iframe: iframeContract,
+    chrome: chromeContract,
+    interactions: { collapse: true, maximize: true, zoom: true, lightTheme: true, hostThemeSync: true },
     rendered: true,
   }));
 } finally {

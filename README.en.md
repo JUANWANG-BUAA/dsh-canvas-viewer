@@ -4,7 +4,7 @@
 
 中文：[README.md](README.md)
 
-Turn investigation, architecture, and design conclusions into real `.canvas.tsx` reports inside DeepSeek Harness: the conversation bubble discovers a report, the macOS-style window lets you read it, the settings gallery manages it, and the sandbox renders it.
+Turn investigation, architecture, and design conclusions into real `.canvas.tsx` reports inside DeepSeek Harness: the conversation bubble discovers a report, the clean macOS-style window reads it on an undistorted pixel plane, the settings gallery manages it, and the sandbox renders it.
 
 ![dsh-canvas-viewer product preview](docs/assets/hero.svg)
 
@@ -70,7 +70,7 @@ Use `DSH_PNPM_NO_OPTIONAL=1` only when the current platform does not need the pr
 ## What you get
 
 - **Conversation bubble**: only a successful `view_canvas` call appears; clicking it opens the report.
-- **Viewer window**: multiple tabs, source/render split, atomic save, hot reload, copy/download, theme switching, Esc close, and mobile full-screen mode.
+- **Viewer window**: clean translucent macOS chrome over an opaque pixel plane, multiple tabs, 70%–140% zoom, source/render split, atomic save, hot reload, copy/download, live host-synchronized appearance, Esc close, and mobile full-screen mode.
 - **Gallery**: all/recent views, search, workspace filtering, path/Markdown/@ references, real-pixel `asset://` thumbnails, and browser-side WebP upload.
 - **Canvas SDK subset**: Stack, Grid, Table, DAG, Stats, Bar/Line/Pie, Callout, CollapsibleSection, and more; unsupported props show a degraded badge.
 - **Diagnostics**: lines, bytes, estimated tokens, inline-data/repetition warnings, soft/hard budgets, and source-mapped compile errors.

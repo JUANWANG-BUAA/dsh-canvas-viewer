@@ -70,7 +70,7 @@ bash scripts/sync-install.sh
 ## 你会得到什么
 
 - **对话气泡**：只有成功的 `view_canvas` 才显示，点击后打开对应报告。
-- **浮窗阅读器**：多 tab、源码/渲染分栏、原子保存、热更新、复制/下载、主题切换、Esc 关闭、手机全屏。
+- **浮窗阅读器**：干净透明的 macOS 窗口外壳 + 不透明像素阅读面，多 tab、70%–140% 缩放、源码/渲染分栏、原子保存、热更新、复制/下载、跟随宿主的实时主题、Esc 关闭、手机全屏。
 - **图库**：全部/最近、搜索、工作区过滤、复制路径/Markdown/@引用、`asset://` 真实像素缩略图、浏览器端 WebP 上传。
 - **Canvas SDK 子集**：Stack、Grid、Table、DAG、Stats、Bar/Line/Pie、Callout、CollapsibleSection 等；不支持的 props 显示降级徽标。
 - **诊断**：行数、字节、估算 tokens、inline-data/重复行提示、预算 soft/hard 策略和来源映射错误定位。

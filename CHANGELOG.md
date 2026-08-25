@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **macOS 阅读窗口**：移除整窗模糊、噪声位移和双层半透明内衬，改为无像素损失的干净合成外壳；三色灯现在分别执行关闭、收起、最大化，工具改为成组控制并加入 70%–140% 画布缩放。
+- **渲染清晰度**：沙箱 iframe 使用单一不透明深/浅像素基底，切换主题不重载、不透出壁纸；`useHostTheme()` 改为实时 token，并保留旧图表闭包兼容。
+- **主题一致性**：插件每次加载默认跟随 dsh 外观并监听宿主深浅色变化，清理旧版独立持久化键，避免浅色图库嵌进深色设置窗口。
+- **真实环境修复**：修复宿主 `.dsh-cv-close` 样式把红灯拉成椭圆，以及 srcdoc 监听器尚未就绪时 MessageChannel 握手丢失的竞态。
+- **验证**：结构/类型/Host/沙箱完整测试、Chromium UI 交互 smoke 和本机真实 dsh profile 深浅色视觉回归通过。
+
 ## 0.4.11 (2026-08-24)
 
 - **DSH 兼容追赶**：CI 改为官方支持的 Node 22/24 矩阵，新增真实 DeepSeek Harness 组合 smoke（`scripts/dsh-smoke.mjs`）并接入 CI `dsh-smoke` job，锁定 DSH `0.1.1-rc.2`。
