@@ -213,9 +213,10 @@ try {
     label: node.querySelector("button")?.getAttribute("aria-label"),
     title: node.querySelector(".dsh-cv-tail-name")?.textContent,
     blur: getComputedStyle(node).backdropFilter || getComputedStyle(node).webkitBackdropFilter,
+    background: getComputedStyle(node).backgroundColor,
     focusable: node.querySelector("button")?.getAttribute("type") === "button",
   }));
-  if (!tailContract.label || !tailContract.title || !tailContract.focusable || !tailContract.blur.includes("blur")) {
+  if (!tailContract.label || !tailContract.title || !tailContract.focusable || tailContract.blur !== "none" || tailContract.background === "rgba(0, 0, 0, 0)") {
     throw new Error(`chat canvas bubble contract failed: ${JSON.stringify(tailContract)}`);
   }
   const library = page.locator(".dsh-cv-lib");
@@ -271,10 +272,11 @@ try {
     backdrop: getComputedStyle(node).backdropFilter || getComputedStyle(node).webkitBackdropFilter,
     traffic: node.querySelectorAll(".dsh-cv-traffic-btn").length,
     toolgroups: node.querySelectorAll(".dsh-cv-toolgroup").length,
+    explicitClose: node.querySelectorAll(".dsh-cv-explicit-close").length,
     wrapperPadding: getComputedStyle(node.querySelector(".dsh-cv-sandbox-wrap")).padding,
     iframeBackground: getComputedStyle(node.querySelector("iframe")).backgroundColor,
   }));
-  if (chromeContract.backdrop !== "none" || chromeContract.traffic !== 3 || chromeContract.toolgroups !== 2) {
+  if (chromeContract.backdrop !== "none" || chromeContract.traffic !== 3 || chromeContract.toolgroups !== 2 || chromeContract.explicitClose !== 1) {
     throw new Error(`viewer chrome contract failed: ${JSON.stringify(chromeContract)}`);
   }
   if (chromeContract.wrapperPadding !== "0px" || !chromeContract.iframeBackground.includes("23, 27, 33")) {
@@ -300,7 +302,7 @@ try {
   }
   await reportFrame.waitForFunction(() => document.documentElement.getAttribute("data-dsh-cv-theme") === "light", undefined, { timeout: 10_000 });
   const lightCanvasBase = await reportFrame.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  if (!lightCanvasBase.includes("246, 247, 249")) throw new Error(`light canvas base failed: ${lightCanvasBase}`);
+  if (!lightCanvasBase.includes("242, 243, 245")) throw new Error(`light canvas base failed: ${lightCanvasBase}`);
   await page.evaluate(() => document.body.setAttribute("data-ds-dark-theme", ""));
   await page.waitForFunction(() => document.documentElement.getAttribute("data-dsh-cv-theme") !== "light", undefined, { timeout: 10_000 });
   await reportFrame.waitForFunction(() => document.documentElement.getAttribute("data-dsh-cv-theme") !== "light", undefined, { timeout: 10_000 });

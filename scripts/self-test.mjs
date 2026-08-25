@@ -292,7 +292,9 @@ assert(clientSrc.includes(".dsh-cv-win::before") && clientSrc.includes("backdrop
 assert(clientSrc.includes("dsh-cv-traffic-btn") && clientSrc.includes("dsh-cv-toolgroup"), "macOS-style functional window controls and grouped tools are present");
 assert(clientSrc.includes("dsh-cv-window-close") && !clientSrc.includes('className: "dsh-cv-traffic-btn dsh-cv-close"'), "traffic-light close control is isolated from legacy host class overrides");
 assert(clientSrc.includes("dsh-cv-zoom") && clientSrc.includes("--cv-scale"), "canvas zoom control scales the isolated pixel plane");
-assert(clientSrc.includes("--cv-canvas-base:#171b21") && clientSrc.includes("--cv-canvas-base:#f6f7f9"), "sandbox canvas has dynamic stable neutral reading bases");
+assert(clientSrc.includes("--cv-canvas-base:#171b21") && clientSrc.includes("--cv-canvas-base:#f2f3f5"), "sandbox canvas has dynamic stable neutral reading bases");
+assert(clientSrc.includes("dsh-cv-explicit-close") && clientSrc.includes('"aria-label": "关闭 Canvas"'), "viewer exposes an always-visible close action");
+assert(clientSrc.includes("html[data-dsh-cv-theme='light'] .cv-callout[data-tone='warning']"), "light canvas overrides dark-only semantic callout fills");
 assert(clientSrc.includes(".dsh-cv-sandbox-wrap{padding:0;border:0;border-radius:0"), "sandbox uses one undistorted opaque pixel plane without a translucent inset");
 assert(clientSrc.includes("dsh:canvas:themechange") && clientSrc.includes("readLiveTheme"), "useHostTheme reacts to sandbox theme changes");
 assert(clientSrc.includes("removeOwnedChrome") && !clientSrc.includes("svg.remove()"), "client-owned chrome cleanup has no obsolete SVG filter lifecycle");

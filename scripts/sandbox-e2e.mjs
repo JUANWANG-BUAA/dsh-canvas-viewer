@@ -77,7 +77,7 @@ function buildSrcdoc(moduleCode, sdk, preact, preactHooks, compat, theme) {
     .replaceAll("html[data-dsh-cv-theme='light'] [data-dsh-cv-lib]", ":root[data-dsh-cv-theme='light']")
     .replaceAll("html[data-dsh-cv-theme='light'] [data-dsh-cv-tail]", ":root[data-dsh-cv-theme='light']");
   const light = theme === "light";
-  const canvasBase = light ? "#f6f7f9" : "#171b21";
+  const canvasBase = light ? "#f2f3f5" : "#171b21";
   const readingTokens = light
     ? "--cv-editor:rgba(244,245,246,.7)!important;--cv-chrome:rgba(255,255,255,.62)!important;--cv-elevated:rgba(255,255,255,.76)!important;--cv-fill-1:rgba(40,47,53,.1)!important;--cv-fill-2:rgba(40,47,53,.065)!important;--cv-fill-3:rgba(40,47,53,.045)!important;--cv-fill-4:rgba(255,255,255,.2)!important;--cv-stroke-1:rgba(45,52,58,.14)!important;--cv-stroke-2:rgba(45,52,58,.13)!important;--cv-stroke-3:rgba(45,52,58,.07)!important;--cv-fg:#202428!important;--cv-fg-2:#484f56!important;--cv-fg-3:#707880!important;--cv-fg-4:#92999f!important;"
     : "--cv-editor:rgba(18,19,21,.44)!important;--cv-chrome:rgba(31,32,35,.54)!important;--cv-elevated:rgba(45,46,50,.58)!important;--cv-fill-1:rgba(255,255,255,.1)!important;--cv-fill-2:rgba(255,255,255,.065)!important;--cv-fill-3:rgba(255,255,255,.045)!important;--cv-fill-4:rgba(0,0,0,.12)!important;--cv-stroke-1:rgba(255,255,255,.12)!important;--cv-stroke-2:rgba(0,0,0,.28)!important;--cv-stroke-3:rgba(255,255,255,.055)!important;--cv-fg:#edf0f2!important;--cv-fg-2:#c9ced3!important;--cv-fg-3:#9ba3aa!important;--cv-fg-4:#707980!important;";

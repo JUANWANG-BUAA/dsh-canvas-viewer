@@ -76,7 +76,11 @@ rm -rf "$SKILL_DEST"
 cp -R "$ROOT/skills/canvas-analysis-report" "$SKILL_DEST"
 
 dsh_plugin_add() {
-  dsh plugin --profile web add "${PNPM_ADD_ARGS[@]}" "$1"
+  if [ "${#PNPM_ADD_ARGS[@]}" -gt 0 ]; then
+    dsh plugin --profile web add "${PNPM_ADD_ARGS[@]}" "$1"
+  else
+    dsh plugin --profile web add "$1"
+  fi
 }
 
 if ! dsh_plugin_add "file:$DEST"; then

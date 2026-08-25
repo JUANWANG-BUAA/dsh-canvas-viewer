@@ -19,7 +19,7 @@ The file therefore has explicit source seams, checked by `scripts/client-contrac
 
 The viewer intentionally separates chrome from content. The host window is a
 clean, high-opacity composited surface with edge highlights but no full-window
-blur or displacement filter. The sandbox is one opaque `#171b21` / `#f6f7f9`
+blur or displacement filter. The sandbox is one opaque `#171b21` / `#f2f3f5`
 pixel plane, so wallpaper detail never contaminates report text, charts, or
 screenshots. Zoom changes the isolated iframe scale from 70% to 140% without
 recompiling or reloading the report.
