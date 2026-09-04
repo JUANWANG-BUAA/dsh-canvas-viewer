@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **DSH 0.1.2-rc.1 compatibility**：真实 smoke 改为 `web` profile + `dsh web` 启动，消费一次性 launch token 建立浏览器 Cookie，再从 `globalThis["__DSH_BOOT__"]` 的 `/plugins/??...` combo 验证 canvas client factory；不再依赖已移除的单包 client URL。CI pin 升级到 `dsh-v0.1.2-rc.1`（`a66e470`），Cordis 生命周期测试依赖升级至 4.0.2。
+- **文档**：README、客户端架构与 AGENTS 同步 0.1.2 的 Web 认证和组合加载边界；token 不写入日志。
+
+- **稳定性 — 启动期崩溃向量（P0）**：`migrateLegacyCanvases` 顶层的裸 `mkdir` 收进 catch 快速返回，`apply()` 的全部 fire-and-forget 调用补 `.catch` 兜底；`$HOME/.dsh` 异常（非目录/EACCES 等）不再产生能击穿整个 DSH 宿主进程的 unhandledRejection（审计探针已复现并回归验证）。
+- **发布一致性 — 版本单一事实源**：`CAPABILITIES.version` 改为从 `package.json` 派生，self-test 断言改为一致性校验；修复 0.4.10/0.4.11 式三处漂移。
+- **测试真实性 — 渲染回归修复**：`regression.mjs` 改用裸 `require("react")` 经本仓库 devDependencies 解析，删除硬编码 Homebrew 全局路径与失效的 `<cwd>/react` 拼接；标准 pnpm 安装下回归套件恢复真实运行而非静默跳过。
+- **正确性 — import 剥离边界**：`prepareSource` 弃用跨语句的 `[\s\S]*?` 懒惰匹配，改用语句级正则逐条剥离 `cursor|dsh|@dsh/canvas` import；无关 import 与夹层代码保留、行号对齐不受影响，新增 dual-import 回归断言。
+- **安全缝隙 — 保存路径**：`writableCanvasTarget` 在词法前缀检查后追加真实根校验，目录符号链接下的新文件保存被拒绝写出到受管目录之外（自测补 symlink-dir 用例）。
+- **性能 — 缓存边界**：编译缓存命中续期获得 LRU 语义，并增加 64MB payload 字节上限（此前 200 × 1.5MB 源理论上可常驻数百 MB）；budget 策略按 size+mtime 缓存，大目录图库不再每行重复同步读取 settings.json。
+- **UI/E1 — 沙箱 Esc 陈旧闭包**：Esc 关闭经 ref 转发到当前 `close`，多标签切换后沙箱内按 Esc 不再使用首次挂载时的旧索引关错标签页。
+- **清理 — 死代码**：移除从未接线的 `budgetState`/`refreshBudget` 及对应自测断言；删除被遮蔽且不可达的 `editorDirty` 首次赋值。
 - **浅色 Canvas 与关闭入口**：浅色沙箱改为 macOS 中性灰内容面，补齐 warning / danger / success callout 的浅色背景，避免深色硬编码导致不可读；移除聊天尾卡的背景模糊；在保留交通灯语义的同时增加始终可见的右上角关闭键。
 
 - **macOS 阅读窗口**：移除整窗模糊、噪声位移和双层半透明内衬，改为无像素损失的干净合成外壳；三色灯现在分别执行关闭、收起、最大化，工具改为成组控制并加入 70%–140% 画布缩放。

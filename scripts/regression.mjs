@@ -7,8 +7,8 @@
  * errors and out-of-subset imports. The SDK is extracted verbatim from
  * lib/client.js at test time so the harness always mirrors the shipped runtime.
  *
- * Requires react + react-dom/server (falls back to the DeepSeek Harness copy;
- * skips with a warning if neither is resolvable).
+ * Requires react + react-dom/server (resolved through this repo's own
+ * devDependencies; skips with a warning if neither is resolvable).
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -19,25 +19,21 @@ import { compileCanvas } from "../lib/index.js";
 const require = createRequire(import.meta.url);
 
 function resolveReact() {
-  const bases = [
-    process.cwd(),
-    "/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/node_modules",
-    "/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules",
-  ];
-  for (const base of bases) {
-    try {
-      const path = require("node:path");
-      const React = require(path.join(base, "react"));
-      let rds;
-      try { rds = require(path.join(base, "react-dom/server.node.js")); } catch {
-        rds = require(path.join(base, "react-dom/server"));
-      }
-      if (React && rds && rds.renderToStaticMarkup) {
-        return { React, renderToStaticMarkup: rds.renderToStaticMarkup };
-      }
-    } catch {
-      // try next base
+  // Bare specifiers resolve via node_modules walks rooted at this script —
+  // correct under pnpm/npm. The previous implementation required absolute
+  // paths like <cwd>/react plus hardcoded Homebrew global DSH copies, which
+  // made the suite silently skip on every standard checkout (G4).
+  try {
+    const React = require("react");
+    let rds;
+    try { rds = require("react-dom/server.node.js"); } catch {
+      rds = require("react-dom/server");
     }
+    if (React && rds && rds.renderToStaticMarkup) {
+      return { React, renderToStaticMarkup: rds.renderToStaticMarkup };
+    }
+  } catch {
+    // fall through to the documented skip path
   }
   return null;
 }

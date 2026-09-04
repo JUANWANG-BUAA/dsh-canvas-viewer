@@ -6,10 +6,13 @@
  * the community-standard `dsh plugin add` flow, then verifies that:
  *
  *   1. the composed host exposes `/api/canvas/list`;
- *   2. the external client bundle is served at `/plugins/dsh-canvas-viewer/client.js`.
+ *   2. the Web boot graph serves a `/plugins/...` combo containing this
+ *      package's external client factory.
  *
  * This is a seam-drift alarm for webServer plugin host loading and the dsh
- * external-factory client protocol.
+ * external-factory client protocol. Harness 0.1.2 groups client factories
+ * into immutable combo scripts, so the old per-package client URL is no
+ * longer a stable public contract.
  *
  * Environment:
  *   HARNESS_DIR  path to an installed deepseek-harness checkout (required)
@@ -51,19 +54,43 @@ async function dsh(args) {
   await run('pnpm', ['dsh', ...args], { cwd: HARNESS_DIR })
 }
 
-async function waitForBoot(exited = () => null) {
+function browserSessionCookie(response) {
+  const setCookies = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie()
+    : [response.headers.get('set-cookie')].filter(Boolean)
+  return setCookies.map(value => value.split(';', 1)[0]).join('; ')
+}
+
+function redactLaunchUrls(value) {
+  return value.replace(/\?token=[^\s]+/g, '?token=<redacted>')
+}
+
+async function waitForBrowserSession(getBootLog, exited = () => null) {
   const deadline = Date.now() + 120_000
   while (Date.now() < deadline) {
     if (exited() !== null) throw new Error('server exited during boot')
-    try {
-      const response = await fetch(BASE, { redirect: 'manual' })
-      if (response.status < 500) return
-    } catch {
-      // not up yet
+    const launchUrl = getBootLog().match(/dsh web:\s+(https?:\/\/\S+)/)?.[1]
+    if (launchUrl) {
+      try {
+        const response = await fetch(launchUrl, { redirect: 'manual' })
+        const cookie = browserSessionCookie(response)
+        if (response.status === 303 && cookie) {
+          return { base: new URL(launchUrl).origin, cookie }
+        }
+      } catch {
+        // the server can print its URL just before the auth route is ready
+      }
     }
     await new Promise(resolve => setTimeout(resolve, 500))
   }
-  throw new Error('server did not boot within 120s')
+  throw new Error('server did not expose an authenticated browser session within 120s')
+}
+
+function pluginScriptUrls(html) {
+  return [...new Set(
+    [...html.matchAll(/\/plugins\/[^"'<>\s]+/g)]
+      .map((match) => match[0].replaceAll('&amp;', '&')),
+  )]
 }
 
 async function main() {
@@ -79,11 +106,11 @@ async function main() {
   }
 
   // 2. Community-standard install: web-app bundle first, then this plugin.
-  await dsh(['plugin', '--profile', 'smoke', 'add', join(HARNESS_DIR, 'packages/bundle/web-app')])
-  await dsh(['plugin', '--profile', 'smoke', 'add', pluginSource])
+  await dsh(['plugin', '--profile', 'web', 'add', join(HARNESS_DIR, 'packages/bundle/web-app')])
+  await dsh(['plugin', '--profile', 'web', 'add', pluginSource])
 
   // 3. Boot the real composition.
-  const server = spawn('pnpm', ['dsh', '--profile', 'smoke', '--no-open', '--port', PORT], {
+  const server = spawn('pnpm', ['dsh', 'web', '--no-open', '--port', PORT], {
     cwd: HARNESS_DIR,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
@@ -97,23 +124,47 @@ async function main() {
     try { process.kill(-server.pid, 'SIGTERM') } catch { /* already gone */ }
   }
   try {
-    await waitForBoot(() => exited)
+    let browser
+    try {
+      browser = await waitForBrowserSession(() => bootLog.join(''), () => exited)
+    } catch (error) {
+      const tail = redactLaunchUrls(bootLog.join('').split('\n').slice(-20).join('\n'))
+      if (tail) console.error(`[dsh-smoke] boot log:\n${tail}`)
+      throw error
+    }
     if (exited !== null) {
-      console.error(`[dsh-smoke] server exited during boot (code ${exited}):\n${bootLog.join('').split('\n').slice(-20).join('\n')}`)
+      console.error(`[dsh-smoke] server exited during boot (code ${exited}):\n${redactLaunchUrls(bootLog.join('').split('\n').slice(-20).join('\n'))}`)
       process.exit(1)
     }
 
-    const list = await fetch(`${BASE}/api/canvas/list`)
+    const request = (url) => fetch(url, { headers: { cookie: browser.cookie } })
+    const list = await request(`${browser.base}/api/canvas/list`)
     if (!list.ok) throw new Error(`GET /api/canvas/list expected 200, got ${list.status}: ${await list.text().catch(() => '')}`)
     const listed = await list.json()
     if (!Array.isArray(listed.items)) throw new Error('GET /api/canvas/list response has no items array')
 
-    const client = await fetch(`${BASE}/plugins/dsh-canvas-viewer/client.js`)
-    if (!client.ok) throw new Error(`GET /plugins/dsh-canvas-viewer/client.js expected 200, got ${client.status}`)
-    const clientText = await client.text()
-    if (!clientText.includes('dsh-canvas-viewer')) throw new Error('client bundle does not contain the dsh-canvas-viewer factory marker')
+    const index = await request(browser.base)
+    if (!index.ok) throw new Error(`GET / expected 200, got ${index.status}`)
+    const indexHtml = await index.text()
+    if (!indexHtml.includes('__DSH_BOOT__') || !indexHtml.includes('window.__ModuleLoader__')) {
+      throw new Error('web index does not contain the DSH client boot graph')
+    }
+    const scripts = pluginScriptUrls(indexHtml)
+    let clientBytes = 0
+    let foundFactory = false
+    for (const script of scripts) {
+      const client = await request(new URL(script, browser.base))
+      if (!client.ok) throw new Error(`GET ${script} expected 200, got ${client.status}`)
+      const clientText = await client.text()
+      if (clientText.includes('dsh-canvas-viewer')) {
+        clientBytes = Buffer.byteLength(clientText)
+        foundFactory = true
+        break
+      }
+    }
+    if (!foundFactory) throw new Error(`web boot graph did not serve a dsh-canvas-viewer factory (checked ${scripts.length} plugin scripts)`)
 
-    console.log(`[dsh-smoke] OK canvas host list=${listed.count ?? '?'}, client bytes=${Buffer.byteLength(clientText)}`)
+    console.log(`[dsh-smoke] OK canvas host list=${listed.count ?? '?'}, client combo bytes=${clientBytes}`)
   } finally {
     kill()
     await new Promise(resolve => setTimeout(resolve, 250))

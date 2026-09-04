@@ -42,9 +42,11 @@ let saveRejectedTmp = false;
 try { writableCanvasTarget("/tmp/evil.canvas.tsx"); } catch { saveRejectedTmp = true; }
 assert(saveRejectedTmp, "save must reject /tmp paths");
 {
-  const { mkdir, symlink, unlink, writeFile } = await import("node:fs/promises");
+  const { mkdir, rm, symlink, unlink, writeFile } = await import("node:fs/promises");
   const link = join(homedir(), ".dsh", "canvases", "z-selftest-outside.canvas.tsx");
   const outside = join(tmpdir(), `dsh-canvas-viewer-outside-${process.pid}.canvas.tsx`);
+  const dirLink = join(homedir(), ".dsh", "canvases", "z-selftest-escape-dir");
+  const escapeDir = join(tmpdir(), `dsh-canvas-viewer-escape-${process.pid}`);
   try {
     await mkdir(join(homedir(), ".dsh", "canvases"), { recursive: true });
     await writeFile(outside, "export default function Outside() { return null; }\n", "utf8");
@@ -53,9 +55,20 @@ assert(saveRejectedTmp, "save must reject /tmp paths");
     let symlinkRejected = false;
     try { resolveCanvasPath(link); } catch { symlinkRejected = true; }
     assert(symlinkRejected, "absolute symlink outside HOME must be rejected");
+
+    // W1 regression: a directory symlink inside the managed canvas dir must
+    // not carry a fresh save to an unmanaged target.
+    await mkdir(escapeDir, { recursive: true });
+    await rm(dirLink, { force: true });
+    await symlink(escapeDir, dirLink);
+    let dirEscapeRejected = false;
+    try { writableCanvasTarget(join(dirLink, "escapee.canvas.tsx")); } catch { dirEscapeRejected = true; }
+    assert(dirEscapeRejected, "save must not follow a directory symlink out of the canvas directory");
   } finally {
     await unlink(link).catch(() => {});
     await unlink(outside).catch(() => {});
+    await unlink(dirLink).catch(() => {});
+    await rm(escapeDir, { recursive: true, force: true });
   }
 }
 ok("resolve guards");
@@ -88,6 +101,15 @@ assert(compiled.code.includes("BarChart"), "prelude exports charts");
 assert(compiled.code.includes("sdk"), "injects sdk prelude");
 assert(!compiled.code.includes('from "dsh/canvas"'), "strips dsh import");
 assert(!compiled.code.includes('from "cursor/canvas"'), "strips cursor import");
+{
+  // C1 regression: the old lazy-strip matched from an unrelated FIRST import
+  // through to the canvas import, deleting everything between them.
+  const dual = 'import { useState } from "react";\nconst MARKER = 7;\nimport { H1 } from "dsh/canvas";\nexport default function Dual() { return null; }\n';
+  const dualOut = await compileCanvas(dual, join(homedir(), "self-test-dual-imports.canvas.tsx"));
+  assert(dualOut.code.includes("useState"), "non-canvas imports survive the strip");
+  assert(dualOut.code.includes("MARKER"), "statements between imports survive the strip");
+  assert(!dualOut.code.includes('from "dsh/canvas"'), "the canvas import itself is still stripped");
+}
 ok("compile pipeline");
 
 // --- compile-error localization ---
@@ -123,7 +145,12 @@ assert(CAPABILITIES.budget.maxLines === null && CAPABILITIES.budget.maxBytes ===
 assert(CAPABILITIES.sandbox.level === "iframe-sandbox", "sandbox capability advertised");
 assert(CAPABILITIES.assets.upload.includes("/api/canvas/assets"), "asset upload capability advertised");
 assert(CAPABILITIES.assets.preview.includes("/api/canvas/assets/raw"), "asset preview capability advertised");
-assert(CAPABILITIES.version === "0.4.10", "capabilities version matches package release");
+{
+  // V0 guard: the advertised version must derive from package.json — a
+  // hardcoded copy here once blessed a stale value across releases.
+  const pkgVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+  assert(CAPABILITIES.version === pkgVersion, "capabilities version derives from package.json");
+}
 assert(CAPABILITIES.sandbox.fallback.includes("fail-closed"), "sandbox fallback is fail-closed");
 assert(readFileSync(new URL("../lib/index.js", import.meta.url), "utf8").includes("hard-budget 拦截"), "hard budget error remains explicit");
 assert(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").includes("允许兼容渲染"), "legacy rendering requires explicit user action");
@@ -269,7 +296,6 @@ assert(clientSrc.includes("connect-src 'none'") && clientSrc.includes("worker-sr
 assert(clientSrc.includes("script-src 'unsafe-inline' blob:") && !clientSrc.includes("script-src 'unsafe-inline' 'unsafe-eval'"), "sandbox CSP uses Blob modules without unsafe-eval");
 assert(clientSrc.includes("Content-Security-Policy"), "sandbox CSP meta is installed");
 assert(hostSrc.includes("migrationBy") && hostSrc.includes("row.provenance"), "host annotates provenance from migration manifest");
-assert(clientSrc.includes("budgetState") && clientSrc.includes("refreshBudget"), "client reads budget policy from capabilities");
 assert(hostSrc.includes("getBudgetPolicy") && hostSrc.includes('budget.enforce') && hostSrc.includes("hard-budget 拦截"), "host budget policy (unrestricted default, hard opt-in)");
 assert(hostSrc.includes("estimatedTokens") && hostSrc.includes("maxBytes") && hostSrc.includes("maxTokens"), "host exposes byte/token telemetry");
 assert(hostSrc.includes("sourceSignals") && clientSrc.includes("含 "), "source-shape warnings reach the gallery");
