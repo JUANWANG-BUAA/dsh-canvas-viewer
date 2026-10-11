@@ -12,7 +12,9 @@
  * This is a seam-drift alarm for webServer plugin host loading and the dsh
  * external-factory client protocol. Harness 0.1.2 groups client factories
  * into immutable combo scripts, so the old per-package client URL is no
- * longer a stable public contract.
+ * longer a stable public contract. Harness 0.2 emits those combo references
+ * as document-relative `plugins/...` URLs (`src="plugins/??..."`) instead of
+ * root-absolute `/plugins/...`, so the scan accepts both spellings.
  *
  * Environment:
  *   HARNESS_DIR  path to an installed deepseek-harness checkout (required)
@@ -87,8 +89,10 @@ async function waitForBrowserSession(getBootLog, exited = () => null) {
 }
 
 function pluginScriptUrls(html) {
+  // Accept both the root-absolute form (`/plugins/??...`, 0.1.x) and the
+  // document-relative form (`plugins/??...`, 0.2) that the index emits.
   return [...new Set(
-    [...html.matchAll(/\/plugins\/[^"'<>\s]+/g)]
+    [...html.matchAll(/(?:\.\/|\/)?plugins\/[^"'<>\s]+/g)]
       .map((match) => match[0].replaceAll('&amp;', '&')),
   )]
 }

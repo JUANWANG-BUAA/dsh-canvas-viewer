@@ -7,7 +7,10 @@ const raw = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-script
   stdio: ["ignore", "pipe", "pipe"],
 });
 const report = JSON.parse(raw);
-const files = new Set(report?.[0]?.files?.map((entry) => entry.path) || []);
+// npm <= 11 reports an array of pack results; npm 12 keys the report object by
+// package name. Accept both shapes so the contract holds across CI and local npm.
+const entry = Array.isArray(report) ? report[0] : Object.values(report)[0];
+const files = new Set(entry?.files?.map((file) => file.path) || []);
 const required = [
   "lib/index.js",
   "lib/client.js",

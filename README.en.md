@@ -15,7 +15,7 @@ Turn investigation, architecture, and design conclusions into real `.canvas.tsx`
 - The Host validates paths, budgets, and assets before compiling. The browser renders inside an opaque-origin iframe with network disabled.
 - `asset://diagram.webp` keeps report source compact. The gallery lazy-loads the first referenced image; it does not execute an entire report just to make a thumbnail.
 - The client remains the dsh external factory. The security-sensitive asset boundary is now strict TypeScript source with a committed JavaScript runtime artifact.
-- Verified with DeepSeek Harness **0.1.2-rc.1** (`dsh-v0.1.2-rc.1`); CI includes a real DSH Web profile, one-time browser token/Cookie, and client boot-graph smoke.
+- Verified with DeepSeek Harness **0.2.0-rc.2** (`dsh-v0.2.0-rc.2`, npm `latest`, the version shipped by DeepSeek Harness Desktop); CI includes a real DSH Web profile, one-time browser token/Cookie, and client boot-graph smoke.
 
 ## Install in one minute
 

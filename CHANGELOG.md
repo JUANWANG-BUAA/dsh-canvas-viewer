@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.4.13 (2026-10-11)
+
+- **DSH 0.2 compatibility**：真实 smoke 兼容 0.2 的组合脚本引用形式 —— 0.2 的 index 把 client combo 写成文档相对路径（`src="plugins/??..."`），此前只匹配带前导 `/` 的 `/plugins/??...`，会误报「boot graph 未提供 canvas factory」；扫描器现同时接受两种写法。CI pin 升级到 `dsh-v0.2.0-rc.2`（`639ed015`）。
+- **验证**：本机 released `dsh 0.2.0-rc.2`（npm `latest`，与桌面 App 同版）与 `master`（0.2.1-alpha.2）源码构建的真实 Web 组合均加载 canvas client factory；`pnpm test` 与 `node scripts/dsh-smoke.mjs` 通过。
+- **工具链兼容 — npm 12**：`scripts/package-contract.mjs` 此前假定 `npm pack --dry-run --json` 返回数组（npm ≤ 11）；npm 12 改为以包名作 key 的对象，导致本地 `pnpm test` 误报「package missing required file: lib/index.js」。现同时接受两种形状，CI（Node 22）与本机 npm 12 均通过。
+- **文档**：README/README.en/AGENTS/CLIENT-ARCHITECTURE 同步 0.2 的 combo URL 形式与验证版本。
+
+## 0.4.12 (2026-09-04)
 
 - **DSH 0.1.2-rc.1 compatibility**：真实 smoke 改为 `web` profile + `dsh web` 启动，消费一次性 launch token 建立浏览器 Cookie，再从 `globalThis["__DSH_BOOT__"]` 的 `/plugins/??...` combo 验证 canvas client factory；不再依赖已移除的单包 client URL。CI pin 升级到 `dsh-v0.1.2-rc.1`（`a66e470`），Cordis 生命周期测试依赖升级至 4.0.2。
 - **文档**：README、客户端架构与 AGENTS 同步 0.1.2 的 Web 认证和组合加载边界；token 不写入日志。

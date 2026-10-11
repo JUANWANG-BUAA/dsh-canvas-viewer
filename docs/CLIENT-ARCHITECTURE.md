@@ -1,9 +1,10 @@
 # Client architecture
 
 `lib/client.js` is intentionally the one dsh external factory entrypoint. In
-DSH 0.1.2, the authenticated Web index exposes the boot graph through
-`globalThis["__DSH_BOOT__"]`; the runtime fetches an immutable `/plugins/??...`
-combo script that contains this factory after the graph resolves the plugin.
+DSH 0.2, the authenticated Web index exposes the boot graph through
+`globalThis["__DSH_BOOT__"]`; the runtime fetches an immutable `plugins/??...`
+combo script (document-relative since 0.2, root-absolute `/plugins/??...` in
+0.1.x) that contains this factory after the graph resolves the plugin.
 Browser ESM imports from sibling files are not part of the pinned contract, and
 `/plugins/dsh-canvas-viewer/client.js` is no longer a stable URL to probe.
 
