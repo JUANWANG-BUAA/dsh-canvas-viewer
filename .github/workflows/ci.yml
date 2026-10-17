@@ -65,8 +65,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: deepseek-ai/deepseek-harness
-          # DeepSeek Harness v0.2.0-rc.2
-          ref: 639ed015397290b3745d163aafe02ffee4aa3f84
+          # DeepSeek Harness v0.2.1-rc.2 — the release Desktop 0.2.1 ships
+          ref: 687f282e8625c6b8d11ff58211a90524be2e4317
           path: .harness
           filter: blob:none
       - name: Install harness

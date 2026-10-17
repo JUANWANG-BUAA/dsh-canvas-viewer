@@ -365,7 +365,7 @@ ok("ui/mobile surface");
   };
   const clientModule = spec.factory(fakeRequire);
   assert(typeof clientModule.apply === "function", "factory exports apply(ctx)");
-  assert(Array.isArray(clientModule.inject) && clientModule.inject.includes("slots") && clientModule.inject.includes("conversationEvents"), "factory declares inject services");
+  assert(Array.isArray(clientModule.inject) && clientModule.inject.includes("slots") && clientModule.inject.includes("uiConversation"), "factory declares inject services");
 }
 ok("client factory bundle");
 

@@ -93,14 +93,14 @@ const server = createServer(async (req, res) => {
         window.__plugin=plugin;
         window.__fixturePath=${JSON.stringify(fixturePath)};
         var ctx={
-          conversationEvents:{register:function(){return function(){};}},
+          uiConversation:{events:{register:function(){return function(){};}}},
           slots:{inject:function(name,fn){if(name==='conversation.chat.turnTail'||name==='settings.section') fn();},register:function(def,component){if(def&&def.name==='conversation.chat.turnTail'){window.__tailSlot={def:def,component:component};}if(def&&def.name==='settings.section'){window.__settingsSlot={def:def,component:component};}return function(){};}},
           effect:function(fn){var dispose=fn();return dispose;}
         };
         plugin.apply(ctx);
         if(window.__tailSlot){
-          var tailPaths=window.__tailSlot.def.select({turn:{data:{get:function(){return {paths:[{path:window.__fixturePath,seq:1}]};}}},seq:1});
-          compat.render(compat.createElement(window.__tailSlot.component,{matched:tailPaths}),document.getElementById('tail-mount'));
+          var tailOwner={turn:{data:{get:function(){return {paths:[{path:window.__fixturePath,seq:1}]};}}},seq:1};
+          compat.render(compat.createElement(window.__tailSlot.component,tailOwner),document.getElementById('tail-mount'));
         }
         if(window.__settingsSlot){
           compat.render(compat.createElement(window.__settingsSlot.component,{}),document.getElementById('library-mount'));

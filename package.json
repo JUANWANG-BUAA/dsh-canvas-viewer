@@ -1,6 +1,6 @@
 {
   "name": "dsh-canvas-viewer",
-  "version": "0.4.13",
+  "version": "0.4.15",
   "description": "DeepSeek Harness plugin + dsh-native canvas-analysis-report skill: open .canvas.tsx reports in a floating viewer with a settings library.",
   "type": "module",
   "license": "MIT",

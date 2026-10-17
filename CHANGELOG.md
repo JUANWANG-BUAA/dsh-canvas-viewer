@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.15 (2026-10-17)
+
+- **DSH 0.2.1-rc.2 验证升级**：CI `dsh-smoke` 的 Harness checkout 与文档统一到 `dsh-v0.2.1-rc.2`（`687f282e`，DeepSeek Harness 桌面 App 0.2.1 所带的版本）。插槽契约无破坏性变更：0.2.1 新增的 `inline` 槽标记与 keyed source 的 `(key, member)` 形式都是可选项，本插件不注册这两者；宿主深浅色仍由 `body[data-ds-dark-theme]` 与 `color-scheme` 双通道判定，两者在 0.2.1 均未改变。
+- **图库空状态重做**：此前只有一行灰字。现在是一个带图标、标题、说明和可选动作的空状态——「最近」模式给出「浏览全部」，「全部」模式在筛选无结果时给出「清除筛选」，用户不会卡在一个空列表前猜下一步。
+- **结果截断提示**：宿主机分页返回被截断时，列表下方明确写出「只显示前 N 项」，不再静默少显示。
+- **聊天尾卡文案收紧**：多份报告不再是一长串「N 个 Canvas 报告 · 点击打开首份」，改为「共 N 份 · 打开最早一份」，与单份时的「Canvas 报告」保持同一行高度，窄屏不折行。
+
+## 0.4.14 (2026-10-11)
+
+- **DSH 0.2 客户端服务适配（修复激活失败）**：client bundle 仍注册到 0.1.x 的 `conversationEvents` 服务；该服务随 `@deepseek-ai/dsh-client-runtime` 在 0.2 中被移除，等价物是 `uiConversation.events`。此前 combo 脚本能加载 factory，但插件在真实 Web 组合里永远停留在 `pending (waiting for service: conversationEvents)`，聊天气泡、浮窗阅读器和「Canvas 图库」设置页都不会注册。现改为注入 `uiConversation` 并调用 `ctx.uiConversation.events.register(...)`。
+- **DSH 0.2 插槽契约适配**：`conversation.chat.turnTail` 是 0.2 的 `list` 插槽，注册必须带 `options.id`（否则抛 `list slot "conversation.chat.turnTail" requires options.id`），并且 `select`/`matched` 只属于 `chain` 插槽。气泡行现注册 `id: "canvas-reports"`，匹配逻辑移入组件，直接读取 0.2 注入的 owner props（`TurnTailOwnerProps.turn.data.get("canvas-reports")` + `seq`）；选择器与 `buildLocationData` 的 turn 级数据契约不变。
+- **测试同步**：`scripts/self-test.mjs` 的 inject 断言与 `scripts/browser-smoke.mjs` 的 ctx stub / 渲染入口改为 `uiConversation.events` 与 owner-props 直传，防止再次退回已移除的服务名与 chain-only 的 `matched` 约定。
+- **验证**：本机 released `dsh 0.2.0-rc.2` 真实 Web 组合中 boot 通知不再列出该插件，浏览器出现 `[data-dsh-canvas-viewer]` 容器与 `#dsh-canvas-viewer-css`，且无页面错误；`pnpm test` 通过。
+
 ## 0.4.13 (2026-10-11)
 
 - **DSH 0.2 compatibility**：真实 smoke 兼容 0.2 的组合脚本引用形式 —— 0.2 的 index 把 client combo 写成文档相对路径（`src="plugins/??..."`），此前只匹配带前导 `/` 的 `/plugins/??...`，会误报「boot graph 未提供 canvas factory」；扫描器现同时接受两种写法。CI pin 升级到 `dsh-v0.2.0-rc.2`（`639ed015`）。
