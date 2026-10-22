@@ -5,7 +5,8 @@
  * Cordis dependency injection, effect disposal, and plugin reload semantics.
  */
 import { EventEmitter } from "node:events";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, copyFileSync, realpathSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { Context, Service } from "@deepseek-ai/cordis";
 import * as pluginModule from "../lib/index.js";
@@ -102,7 +103,9 @@ class FakeResponse extends EventEmitter {
   }
 }
 
-const fixture = join(process.cwd(), "fixtures", "audit-sample.canvas.tsx");
+const fixtureDir = realpathSync(mkdtempSync(join(homedir(), ".canvas-lifecycle-")));
+const fixture = join(fixtureDir, "audit-sample.canvas.tsx");
+copyFileSync(new URL("../fixtures/audit-sample.canvas.tsx", import.meta.url), fixture);
 assert(readFileSync(fixture, "utf8").includes("export default"), "fixture must be a canvas module");
 
 const ctx = new Context();
@@ -141,6 +144,11 @@ async function exerciseCycle() {
   assert(res.ended, "plugin disposal must close the active SSE response");
 }
 
-await exerciseCycle();
-await exerciseCycle();
-console.log(JSON.stringify({ ok: true, cycles: 2, routes: web.routes.length, tools: tools.tools.length }));
+try {
+  await exerciseCycle();
+  await exerciseCycle();
+  console.log(JSON.stringify({ ok: true, cycles: 2, routes: web.routes.length, tools: tools.tools.length }));
+} finally {
+  assert(fixtureDir.startsWith(realpathSync(homedir()) + "/.canvas-lifecycle-"), "cleanup must stay in test fixture");
+  rmSync(fixtureDir, { recursive: true, force: true });
+}

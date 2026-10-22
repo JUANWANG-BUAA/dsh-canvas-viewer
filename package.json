@@ -1,7 +1,7 @@
 {
   "name": "dsh-canvas-viewer",
-  "version": "0.4.15",
-  "description": "DeepSeek Harness plugin + dsh-native canvas-analysis-report skill: open .canvas.tsx reports in a floating viewer with a settings library.",
+  "version": "0.6.0",
+  "description": "DeepSeek Harness Canvas workspace with native TUI and Web readers, versioned data-only reports, isolated TSX rendering, and a dsh-native authoring skill.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -23,6 +23,8 @@
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./tui": "./lib/tui/index.mjs",
+    "./report": "./lib/report/schema.mjs",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -31,9 +33,13 @@
     "lib/client.js",
     "lib/preview.mjs",
     "lib/host",
+    "lib/report",
+    "lib/tui",
+    "dsh-plugin.json",
     "src",
     "tsconfig.json",
     "assets",
+    "fixtures",
     "cordis.patch.yml",
     "README.md",
     "README.en.md",
@@ -46,13 +52,19 @@
     "scripts"
   ],
   "scripts": {
-    "test": "node scripts/sync-skill-mirrors.mjs --check && pnpm typecheck && node scripts/syntax-check.mjs && node scripts/package-contract.mjs && node scripts/client-contract.mjs && node scripts/self-test.mjs && node scripts/budget-report.mjs && node scripts/cordis-lifecycle.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
+    "test": "node scripts/build-client.mjs --check && node scripts/sync-skill-mirrors.mjs --check && pnpm typecheck && node scripts/syntax-check.mjs && node scripts/package-contract.mjs && node scripts/client-contract.mjs && node scripts/render-isolation.mjs && node scripts/gallery-state.mjs && node scripts/editor-state.mjs && node scripts/workspace-host.mjs && node scripts/report-schema.mjs && node scripts/report-repository.mjs && node scripts/tui-reader.mjs && node scripts/self-test.mjs && node scripts/budget-report.mjs && node scripts/cordis-lifecycle.mjs && node scripts/regression.mjs && node scripts/sandbox-e2e.mjs",
+    "test:tui": "node scripts/report-schema.mjs && node scripts/report-repository.mjs && node scripts/tui-reader.mjs",
+    "test:tui-runtime": "node scripts/tui-runtime-smoke.mjs && node scripts/tui-render-smoke.mjs",
+    "test:tui-browser": "node scripts/tui-browser-smoke.mjs",
+    "test:workspace": "node scripts/render-isolation.mjs && node scripts/gallery-state.mjs && node scripts/editor-state.mjs && node scripts/workspace-host.mjs",
     "test:sandbox": "node scripts/sandbox-e2e.mjs",
     "test:lifecycle": "node scripts/cordis-lifecycle.mjs",
     "test:browser": "node scripts/browser-smoke.mjs",
     "test:dsh": "node scripts/dsh-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "build:host": "tsc -p tsconfig.json",
+    "build:client": "node scripts/build-client.mjs",
+    "test:client-build": "node scripts/build-client.mjs --check",
     "test:client": "node scripts/client-contract.mjs",
     "test:syntax": "node scripts/syntax-check.mjs",
     "test:compile": "node scripts/compile-sample.mjs",

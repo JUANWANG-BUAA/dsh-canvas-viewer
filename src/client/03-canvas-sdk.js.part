@@ -1,0 +1,1069 @@
+    /* @client-module canvas-sdk: dsh/canvas component and hook subset */
+    function gapStyle(gap) {
+      if (gap == null) return 10;
+      if (typeof gap === "number") return gap;
+      return 10;
+    }
+
+    function alignItems(align) {
+      if (align === "start") return "flex-start";
+      if (align === "end") return "flex-end";
+      if (align === "stretch") return "stretch";
+      return "center";
+    }
+
+    function justifyContent(justify) {
+      if (justify === "center") return "center";
+      if (justify === "end") return "flex-end";
+      if (justify === "space-between") return "space-between";
+      return "flex-start";
+    }
+
+    function mergeStyle(base, override) {
+      return Object.assign({}, base || {}, override || {});
+    }
+
+    function computeDAGLayout(input) {
+      var nodes = (input && input.nodes) || [];
+      var edges = (input && input.edges) || [];
+      var direction = (input && input.direction) || "vertical";
+      var nodeWidth = (input && input.nodeWidth) || 160;
+      var nodeHeight = (input && input.nodeHeight) || 44;
+      var rankGap = (input && input.rankGap) || 64;
+      var nodeGap = (input && input.nodeGap) || 28;
+      var padding = (input && input.padding) || 24;
+      var ids = nodes.map(function (n) { return n.id; });
+      var rank = {};
+      ids.forEach(function (id) { rank[id] = 0; });
+      var changed = true;
+      var guard = 0;
+      while (changed && guard < 64) {
+        changed = false;
+        guard += 1;
+        edges.forEach(function (edge) {
+          if (rank[edge.from] == null || rank[edge.to] == null) return;
+          var next = rank[edge.from] + 1;
+          if (rank[edge.to] < next) {
+            rank[edge.to] = next;
+            changed = true;
+          }
+        });
+      }
+      var groups = {};
+      ids.forEach(function (id) {
+        var r = rank[id] || 0;
+        if (!groups[r]) groups[r] = [];
+        groups[r].push(id);
+      });
+      var ranks = Object.keys(groups).map(Number).sort(function (a, b) { return a - b; });
+      var pos = {};
+      var width = padding;
+      var height = padding;
+      var rankBoxes = [];
+      ranks.forEach(function (r) {
+        var minX = Infinity;
+        var minY = Infinity;
+        var maxX = 0;
+        var maxY = 0;
+        groups[r].forEach(function (id, order) {
+          var x = direction === "horizontal"
+            ? padding + r * (nodeWidth + rankGap)
+            : padding + order * (nodeWidth + nodeGap);
+          var y = direction === "horizontal"
+            ? padding + order * (nodeHeight + nodeGap)
+            : padding + r * (nodeHeight + rankGap);
+          pos[id] = {
+            id: id, x: x, y: y, rank: r, order: order,
+            width: nodeWidth, height: nodeHeight,
+          };
+          width = Math.max(width, x + nodeWidth + padding);
+          height = Math.max(height, y + nodeHeight + padding);
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + nodeWidth);
+          maxY = Math.max(maxY, y + nodeHeight);
+        });
+        rankBoxes.push({
+          rank: r, x: minX, y: minY,
+          width: maxX - minX, height: maxY - minY,
+          nodeIds: groups[r].slice(),
+        });
+      });
+      var layoutEdges = edges.map(function (edge) {
+        var a = pos[edge.from];
+        var b = pos[edge.to];
+        if (!a || !b) return null;
+        var sourceX;
+        var sourceY;
+        var targetX;
+        var targetY;
+        if (direction === "horizontal") {
+          sourceX = a.x + nodeWidth;
+          sourceY = a.y + nodeHeight / 2;
+          targetX = b.x;
+          targetY = b.y + nodeHeight / 2;
+        } else {
+          sourceX = a.x + nodeWidth / 2;
+          sourceY = a.y + nodeHeight;
+          targetX = b.x + nodeWidth / 2;
+          targetY = b.y;
+        }
+        var midX = (sourceX + targetX) / 2;
+        var midY = (sourceY + targetY) / 2;
+        return {
+          from: edge.from, to: edge.to,
+          sourceX: sourceX, sourceY: sourceY,
+          targetX: targetX, targetY: targetY,
+          isBackEdge: false,
+          points: [
+            { x: sourceX, y: sourceY },
+            { x: midX, y: midY },
+            { x: targetX, y: targetY },
+          ],
+        };
+      }).filter(Boolean);
+      return {
+        nodes: ids.map(function (id) { return pos[id]; }).filter(Boolean),
+        edges: layoutEdges,
+        ranks: rankBoxes,
+        direction: direction,
+        width: width,
+        height: height,
+      };
+    }
+
+    function createSdk(ReactLib) {
+      /**
+      * Give key-less array children stable keys so mixed children like
+      * <Text>a<Code>x</Code></Text> never trigger React key warnings.
+      * (Strings/numbers pass through untouched.)
+      */
+      function keyedChildren(children) {
+        if (!Array.isArray(children)) return children;
+        var out = [];
+        for (var ki = 0; ki < children.length; ki++) {
+          var kc = children[ki];
+          if (kc && typeof kc === "object" && !Array.isArray(kc) && kc.key == null) {
+            out.push(ReactLib.cloneElement(kc, { key: "cv-c" + ki }));
+          } else {
+            out.push(kc);
+          }
+        }
+        return out;
+      }
+      var category = {
+        gray: "#9a9a9a",
+        purple: "#c4b5fd",
+        green: "#9ccc9c",
+        yellow: "#e8c070",
+        cyan: "#7ec8c8",
+        pink: "#e8a0c4",
+        blue: "#8ab4f8",
+        orange: "#f6c177",
+        red: "#e8a0a0",
+      };
+      function readLiveTheme() {
+        var doc = typeof document !== "undefined" ? document : null;
+        var root = doc ? (doc.querySelector("[data-dsh-cv-canvas]") || doc.documentElement) : null;
+        var style = root && typeof window !== "undefined" && window.getComputedStyle
+          ? window.getComputedStyle(root)
+          : { getPropertyValue: function () { return ""; } };
+        var light = !!(doc && doc.documentElement.getAttribute("data-dsh-cv-theme") === "light");
+        var cv = function (name, fallback) {
+          var value = style.getPropertyValue(name).trim();
+          return value || fallback;
+        };
+        var tokens = {
+          bg: {
+            editor: cv("--cv-editor", light ? "#f2f3f5" : "#171b21"),
+            chrome: cv("--cv-chrome", light ? "#fbfcfd" : "#1a1d22"),
+            elevated: cv("--cv-elevated", light ? "#ffffff" : "#2a2d33"),
+            sidebar: cv("--cv-chrome", light ? "#fbfcfd" : "#1a1d22"),
+          },
+          text: {
+            primary: cv("--cv-fg", light ? "#1d2025" : "#f2f2f4"),
+            secondary: cv("--cv-fg-2", light ? "#474d55" : "#d0d2d7"),
+            tertiary: cv("--cv-fg-3", light ? "#6c737c" : "#989da5"),
+            quaternary: cv("--cv-fg-4", light ? "#8f969e" : "#737983"),
+            link: cv("--cv-link", light ? "#526b7d" : "#b5c2ce"),
+            onAccent: cv("--cv-on-accent", light ? "#ffffff" : "#131619"),
+          },
+          stroke: {
+            primary: cv("--cv-stroke-1", light ? "rgba(45,52,58,.15)" : "rgba(255,255,255,.12)"),
+            secondary: cv("--cv-stroke-2", "rgba(45,52,58,.13)"),
+            tertiary: cv("--cv-stroke-3", light ? "rgba(45,52,58,.07)" : "rgba(255,255,255,.055)"),
+            focused: cv("--cv-stroke-focus", light ? "#637b8b" : "#c4d0da"),
+          },
+          fill: {
+            primary: cv("--cv-fill-1", "rgba(255,255,255,.1)"),
+            secondary: cv("--cv-fill-2", "rgba(255,255,255,.065)"),
+            tertiary: cv("--cv-fill-3", "rgba(255,255,255,.045)"),
+            quaternary: cv("--cv-fill-4", "rgba(0,0,0,.12)"),
+          },
+          accent: {
+            primary: cv("--cv-accent", light ? "#718796" : "#aebdca"),
+            control: cv("--cv-accent", light ? "#718796" : "#aebdca"),
+            controlHover: cv("--cv-accent-hover", light ? "#5c7484" : "#c7d3dc"),
+          },
+          diff: {
+            insertedLine: category.green,
+            removedLine: category.red,
+            stripAdded: light ? "#dcebdd" : "#1d3b1d",
+            stripRemoved: light ? "#f1dddd" : "#3b1d1d",
+          },
+          category: category,
+        };
+        return Object.assign({
+          kind: light ? "light" : "dark",
+          tokens: tokens,
+          category: category,
+          palette: [category.blue, category.orange, category.green, category.red, category.purple],
+          bg: tokens.bg.editor,
+          panel: tokens.bg.chrome,
+          text: tokens.text.primary,
+          textSecondary: tokens.text.secondary,
+          border: tokens.stroke.tertiary,
+          accent: tokens.accent.primary,
+        }, tokens);
+      }
+
+      // Older chart implementations consume this closure directly. Keep the
+      // snapshot live so existing canvases and the hook share one theme source.
+      var theme = readLiveTheme();
+
+      function useHostTheme() {
+        var _theme = ReactLib.useState(theme);
+        var liveTheme = _theme[0];
+        var setLiveTheme = _theme[1];
+        ReactLib.useEffect(function () {
+          var refresh = function () {
+            theme = readLiveTheme();
+            setLiveTheme(theme);
+          };
+          window.addEventListener("dsh:canvas:themechange", refresh);
+          window.addEventListener("dsh:canvas:theme", refresh);
+          return function () {
+            window.removeEventListener("dsh:canvas:themechange", refresh);
+            window.removeEventListener("dsh:canvas:theme", refresh);
+          };
+        }, []);
+        return liveTheme;
+      }
+      var canvasStateStore = new WeakMap();
+      function useCanvasState(key, initial) {
+        // Key-scoped state: scoped per mount instance so two canvases using the
+        // same key string never collide, and per-key within one canvas.
+        if (!key) return ReactLib.useState(initial);
+        var instId = ReactLib.useState({})[0];
+        var ns = canvasStateStore.get(instId);
+        if (!ns) { ns = {}; canvasStateStore.set(instId, ns); }
+        var pair = ReactLib.useState(ns[key] !== undefined ? ns[key] : initial);
+        if (ns[key] === undefined) ns[key] = pair[0];
+        var setter = function (v) {
+          var next = typeof v === "function" ? v(pair[0]) : v;
+          ns[key] = next;
+          pair[1](next);
+        };
+        return [pair[0], setter];
+      }
+      function useCanvasAction() {
+        // Real (minimal) action bus: dispatch fires a window CustomEvent the
+        // viewer subscribes to and surfaces as a toast — no more silent noop.
+        return function dispatch(action) {
+          var type = action && action.type ? String(action.type) : "action";
+          var payload = action && action.path ? String(action.path) : "";
+          if (typeof window !== "undefined" && window.dispatchEvent) {
+            try {
+              window.dispatchEvent(new CustomEvent("dsh:canvas:action", { detail: action || {} }));
+            } catch { /* ignore */ }
+          }
+          return { ok: true, type: type, payload: payload };
+        };
+      }
+
+      function Stack(props) {
+        return h("div", {
+          className: "cv-stack",
+          style: mergeStyle({ gap: gapStyle(props.gap) }, props.style),
+        }, keyedChildren(props.children));
+      }
+      function Row(props) {
+        return h("div", {
+          className: "cv-row",
+          style: mergeStyle({
+            gap: gapStyle(props.gap),
+            alignItems: alignItems(props.align),
+            justifyContent: justifyContent(props.justify),
+            flexWrap: props.wrap === false ? "nowrap" : "wrap",
+          }, props.style),
+        }, keyedChildren(props.children));
+      }
+      function Grid(props) {
+        var columns = props.columns || 2;
+        return h("div", {
+          className: "cv-grid",
+          style: mergeStyle({
+            gap: gapStyle(props.gap),
+            alignItems: alignItems(props.align || "start"),
+            gridTemplateColumns: typeof columns === "number"
+              ? "repeat(" + columns + ", minmax(0, 1fr))"
+              : String(columns),
+            width: "100%",
+          }, props.style),
+        }, keyedChildren(props.children));
+      }
+      function H1(props) { return h("h1", { className: "cv-h1", style: props.style }, keyedChildren(props.children)); }
+      function H2(props) { return h("h2", { className: "cv-h2", style: props.style }, keyedChildren(props.children)); }
+      function H3(props) { return h("h3", { className: "cv-h3", style: props.style }, keyedChildren(props.children)); }
+      function Text(props) {
+        var tone = props.tone || props.variant || "primary";
+        if (tone === "muted") tone = "tertiary";
+        var tag = props.as || "p";
+        var truncate = props.truncate === true ? "end" : (props.truncate || undefined);
+        return h(tag, {
+          className: "cv-text",
+          "data-tone": tone,
+          "data-size": props.size === "small" ? "small" : "body",
+          "data-weight": props.weight || "normal",
+          "data-italic": props.italic ? "1" : undefined,
+          "data-truncate": truncate,
+          style: mergeStyle({ display: tag === "span" ? "inline" : undefined }, props.style),
+        }, keyedChildren(props.children));
+      }
+      function Pill(props) {
+        var on = props.selected || props.active || props.current ? "1" : "0";
+        return h("button", {
+          type: "button",
+          className: "cv-pill",
+          "data-on": on,
+          "data-size": props.size === "sm" || props.size === "small" ? "sm" : "md",
+          "data-tone": props.tone || props.color || undefined,
+          onClick: props.onClick,
+          style: props.style,
+        }, keyedChildren(props.children));
+      }
+      function Stat(props) {
+        return h("div", {
+          className: "cv-stat",
+          "data-tone": props.tone || undefined,
+          style: props.style,
+        },
+          h("b", null, props.value != null ? String(props.value) : props.children),
+          h("span", null, props.label || props.title || ""));
+      }
+      function Card(props) {
+        return h("div", {
+          className: "cv-card",
+          "data-size": props.size || "md",
+          style: props.style,
+        }, keyedChildren(props.children));
+      }
+      function CardHeader(props) {
+        var main = props.title != null ? props.title : props.children;
+        var size = props.size === "sm" || props.size === "small" ? "sm" : (props.size === "lg" || props.size === "large" ? "lg" : "md");
+        var tone = props.tone || props.variant;
+        return h("div", {
+          className: "cv-card-h",
+          "data-size": size,
+          "data-tone": tone || undefined,
+          style: props.style,
+        },
+          h("div", { className: "cv-card-h-main" }, main),
+          props.trailing ? h("div", { className: "cv-card-h-trail" }, props.trailing) : null,
+        );
+      }
+      function CardBody(props) {
+        return h("div", { className: "cv-card-b", style: props.style }, keyedChildren(props.children));
+      }
+      function Callout(props) {
+        var tone = props.tone || props.variant || "info";
+        return h("div", {
+          className: "cv-callout",
+          "data-tone": tone,
+          style: props.style,
+        },
+          props.title ? h("strong", { className: "cv-callout-title" }, props.title) : null,
+          keyedChildren(props.children),
+        );
+      }
+      function Code(props) {
+        return h("code", { className: "cv-code", style: props.style }, keyedChildren(props.children));
+      }
+      function Divider(props) { return h("hr", { className: "cv-div", style: props && props.style }); }
+      function Spacer(props) {
+        return h("div", { style: { flex: props && props.grow != null ? props.grow : 1, height: (props && props.size) || undefined, minWidth: 0 } });
+      }
+      function Button(props) {
+        var variant = props.variant || "ghost";
+        return h("button", {
+          type: "button",
+          className: "dsh-cv-btn",
+          "data-variant": variant,
+          onClick: props.onClick,
+          disabled: props.disabled,
+          style: props.style,
+        }, keyedChildren(props.children));
+      }
+      function Link(props) {
+        return h("a", {
+          href: props.href || props.to || "#",
+          target: props.target,
+          style: mergeStyle({ color: "var(--cv-link)" }, props.style),
+        }, keyedChildren(props.children));
+      }
+      function Table(props) {
+        var headers = props.headers;
+        var rows = props.rows || [];
+        if (!headers && Array.isArray(props.columns)) {
+          headers = props.columns.map(function (col) {
+            return typeof col === "string" ? col : (col.header || col.label || col.key);
+          });
+        }
+        if (!headers && rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0])) {
+          headers = Object.keys(rows[0]);
+        }
+        headers = headers || [];
+        var framed = props.framed !== false;
+        var striped = !!props.striped;
+        var sticky = !!props.stickyHeader;
+        var aligns = props.columnAlign || [];
+        var tones = props.rowTone || [];
+        var sortable = !!props.sortable;
+        if (!rows.length && props.emptyMessage != null) {
+          return h("div", { className: "cv-table-wrap", "data-framed": framed ? "1" : "0", style: props.style },
+            h("div", { className: "cv-table-empty" }, props.emptyMessage),
+          );
+        }
+        // Row models decouple data order from display order so sorting never
+        // detaches a row from its tone dot.
+        var models = rows.map(function (row, i) {
+          var cells;
+          if (Array.isArray(row)) cells = row;
+          else if (row && typeof row === "object") {
+            cells = headers.map(function (head, idx) {
+              var col = (props.columns && props.columns[idx]) || head;
+              var key = typeof col === "string" ? col : col.key;
+              return row[key] != null ? row[key] : row[head];
+            });
+          } else cells = [row];
+          while (cells.length < headers.length) cells.push("");
+          return { key: i, cells: cells.slice(0, headers.length), tone: tones[i] || "" };
+        });
+        var sortState = ReactLib.useState(null);
+        var sort = sortState[0];
+        var setSort = sortState[1];
+        if (sortable && sort && sort.col < headers.length) {
+          models = models.slice().sort(function (a, b) {
+            var av = sortVal(a.cells[sort.col]);
+            var bv = sortVal(b.cells[sort.col]);
+            var cmp;
+            if (av != null && bv != null) cmp = av - bv;
+            else {
+              var at = String(a.cells[sort.col] == null ? "" : a.cells[sort.col]);
+              var bt = String(b.cells[sort.col] == null ? "" : b.cells[sort.col]);
+              cmp = at.localeCompare(bt, "zh-Hans-CN");
+            }
+            return cmp * (sort.dir === "desc" ? -1 : 1);
+          });
+        }
+        var toggleSort = function (i) {
+          setSort(function (prev) {
+            if (prev && prev.col === i) {
+              if (prev.dir === "asc") return { col: i, dir: "desc" };
+              return null;
+            }
+            return { col: i, dir: "asc" };
+          });
+        };
+        var table = h("table", {
+          className: "cv-table",
+          "data-sticky": sticky ? "1" : "0",
+          "data-sortable": sortable && sort ? "1" : "0",
+        },
+          h("thead", null, h("tr", null, headers.map(function (head, i) {
+            var active = sort && sort.col === i;
+            return h("th", {
+              key: i,
+              style: { textAlign: aligns[i] || "left" },
+              "data-sortable": sortable ? "1" : "0",
+              "aria-sort": active ? (sort.dir === "asc" ? "ascending" : "descending") : null,
+              onClick: sortable ? function () { toggleSort(i); } : null,
+            },
+              head,
+              active ? h("span", { key: "ind", className: "cv-sort-ind", "aria-hidden": "true" }, sort.dir === "asc" ? " ↑" : " ↓") : null);
+          }))),
+          h("tbody", null, models.map(function (model, i) {
+            return h("tr", { key: model.key, "data-stripe": striped && i % 2 === 1 ? "1" : "0" }, model.cells.map(function (cell, j) {
+              var content = cell;
+              if (cell && typeof cell === "object" && !Array.isArray(cell) && (cell.href != null || cell.to != null)) {
+                var cellLabel = cell.label != null ? cell.label : (cell.text != null ? cell.text : "");
+                content = h("a", {
+                  key: "a",
+                  href: cell.href || cell.to,
+                  target: cell.target,
+                  style: { color: "var(--cv-link)" },
+                }, String(cellLabel));
+              }
+              if (j === 0 && model.tone) {
+                content = [h("span", { key: "dot", className: "cv-tone-dot", "data-tone": model.tone }), content];
+              }
+              return h("td", { key: j, style: { textAlign: aligns[j] || "left" } }, keyedChildren(content));
+            }));
+          })),
+        );
+        return h("div", {
+          className: "cv-table-wrap",
+          "data-framed": framed ? "1" : "0",
+          style: props.style,
+        },
+          unsupportedBadge(props, ["encoding"]),
+          table,
+        );
+      }
+
+      function renderTodoItems(todos) {
+        return h("ul", { className: "cv-todo" },
+          todos.map(function (todo, i) {
+            var label = typeof todo === "string" ? todo : (todo.content || todo.text || todo.title);
+            var status = typeof todo === "string" ? "pending" : (todo.status || "pending");
+            return h("li", { key: (todo && todo.id) || i, "data-status": status },
+              h("span", { className: "cv-todo-mark", "aria-hidden": "true" }),
+              h("span", null, label),
+            );
+          }),
+        );
+      }
+      function TodoList(props) {
+        return renderTodoItems(props.todos || props.items || []);
+      }
+      function TodoListCard(props) {
+        return h(Card, null,
+          h(CardHeader, { title: props.title || "Todos" }),
+          h(CardBody, null, renderTodoItems(props.todos || props.items || [])),
+        );
+      }
+
+      function Swatch(props) {
+        var color = props.color || props.tone || "blue";
+        var hex = category[color] || color;
+        return h("span", { className: "cv-swatch", style: props.style },
+          h("i", { style: { background: hex } }),
+          props.children || props.label || color,
+        );
+      }
+
+      function UsageBar(props) {
+        var segments = props.segments || props.items || [];
+        var total = segments.reduce(function (sum, seg) {
+          return sum + (Number(seg.value) || 0);
+        }, 0) || 1;
+        return h("div", { className: "cv-usage", style: props.style },
+          props.showLabels !== false ? h("div", { className: "cv-usage-labels" },
+            segments.map(function (seg, i) {
+              var color = category[seg.color] || seg.color || theme.palette[i % theme.palette.length];
+              return h("span", { key: i },
+                h("i", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 99, background: color, marginRight: 6 } }),
+                (seg.label || seg.name || "") + " · " + (seg.value != null ? seg.value : ""),
+              );
+            }),
+          ) : null,
+          h("div", { className: "cv-usage-track" },
+            segments.map(function (seg, i) {
+              var color = category[seg.color] || seg.color || theme.palette[i % theme.palette.length];
+              var pct = ((Number(seg.value) || 0) / total) * 100;
+              return h("div", {
+                key: i,
+                className: "cv-usage-seg",
+                style: { width: pct + "%", background: color },
+                title: String(seg.label || ""),
+              });
+            }),
+          ),
+        );
+      }
+
+      function normalizeSeries(props) {
+        if (Array.isArray(props.series)) return props.series;
+        if (Array.isArray(props.data)) {
+          return [{ name: props.name || "series", data: props.data }];
+        }
+        return [];
+      }
+
+      function numOf(d) {
+        if (typeof d === "number") return d;
+        if (d && d.y != null) return Number(d.y) || 0;
+        if (d && d.value != null) return Number(d.value) || 0;
+        return 0;
+      }
+
+      /**
+      * Sort value for a table cell: numbers compare numerically even when the
+      * cell renders as a decorated string; everything else compares as zh text.
+      */
+      function sortVal(cell) {
+        if (typeof cell === "number") return cell;
+        if (cell && typeof cell === "object") cell = cell.label != null ? cell.label : (cell.text != null ? cell.text : "");
+        var s = String(cell == null ? "" : cell).trim();
+        var n = Number(s.replace(/,/g, ""));
+        return (s !== "" && n === n) ? n : null;
+      }
+
+      /**
+      * Surface a prop the subset cannot render as a small ▤ badge instead of
+      * silently dropping it (P0: no silent semantic loss).
+      */
+      function unsupportedBadge(props, keys) {
+        var present = (keys || []).filter(function (k) {
+          return props[k] !== undefined && props[k] !== null;
+        });
+        if (!present.length) return null;
+        return h("span", {
+          className: "cv-degraded",
+          title: "降级渲染：忽略 " + present.join(", "),
+          "aria-label": "降级渲染：忽略 " + present.join(", "),
+        }, "▤ 降级 " + present.length);
+      }
+
+      function seriesLegend(series, colors) {
+        if (!series || series.length < 2) return null;
+        return h("div", { className: "cv-chart-legend" },
+          series.map(function (s, i) {
+            return h("span", { key: i },
+              h("i", { style: { background: colors[i] } }),
+              s.name || ("系列 " + (i + 1)),
+            );
+          }),
+        );
+      }
+
+      function niceTicks(max, count) {
+        if (!(max > 0) || !isFinite(max)) max = 1;
+        var n = count || 4;
+        var raw = max / n;
+        var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+        var norm = raw / mag;
+        var step;
+        if (norm <= 1) step = 1;
+        else if (norm <= 2) step = 2;
+        else if (norm <= 5) step = 5;
+        else step = 10;
+        step = step * mag;
+        var ticks = [];
+        var v = 0;
+        while (v <= max + step * 0.001) {
+          ticks.push(Number(v.toPrecision(12)));
+          v += step;
+        }
+        return { ticks: ticks, step: step, max: ticks[ticks.length - 1] };
+      }
+
+      function BarChart(props) {
+        var series = normalizeSeries(props);
+        var cats = props.categories || (series[0] && series[0].data
+          ? series[0].data.map(function (d, i) { return d && (d.label != null ? d.label : (d.x != null ? d.x : String(i + 1))); })
+          : []);
+        var height = props.height || 160;
+        var width = props.width || 420;
+        var suffix = props.valueSuffix || "";
+        var beginAtZero = props.beginAtZero !== false;
+        var values = [];
+        series.forEach(function (s) {
+          (s.data || []).forEach(function (d) { values.push(numOf(d)); });
+        });
+        var dataMax = Math.max.apply(null, values.concat([1]));
+        var yMax = props.yMax != null ? Number(props.yMax) : dataMax;
+        if (beginAtZero) yMax = Math.max(yMax, 0);
+        var tickInfo = niceTicks(yMax, 4);
+        var yTop = Math.max(tickInfo.max, yMax);
+        var yBottom = beginAtZero ? 0 : Math.min(0, props.yMin != null ? Number(props.yMin) : 0);
+        var spanY = Math.max(yTop - yBottom, 1e-9);
+        var padL = 30;
+        var padR = 6;
+        var plotTop = 18;
+        var plotBottom = height - 24;
+        var plotH = Math.max(plotBottom - plotTop, 1);
+        var xFor = function (di) {
+          return padL + (di * (width - padL - padR)) / Math.max(cats.length, 1);
+        };
+        var yFor = function (v) {
+          return plotBottom - ((v - yBottom) / spanY) * plotH;
+        };
+        var groupW = (width - padL - padR) / Math.max(cats.length, 1);
+        var barW = Math.max(3, (groupW - 8) / Math.max(series.length, 1));
+        var showValues = props.showValues !== false && barW >= 10;
+        var els = [];
+        tickInfo.ticks.forEach(function (t) {
+          var y = yFor(t);
+          els.push(h("line", { key: "g" + t, className: "cv-chart-grid", x1: padL, x2: width - padR, y1: y, y2: y }));
+          els.push(h("text", { key: "t" + t, className: "cv-chart-tick", x: padL - 5, y: y + 3, textAnchor: "end" }, String(t)));
+        });
+        series.forEach(function (s, si) {
+          var color = category[s.color] || s.color || theme.palette[si % theme.palette.length];
+          (s.data || []).forEach(function (d, di) {
+            var v = numOf(d);
+            var x = xFor(di) + si * barW + 4;
+            var yTopBar = yFor(Math.max(v, yBottom));
+            var yBotBar = yFor(Math.max(yBottom, 0));
+            var tip = (series.length > 1 && s.name ? s.name + " · " : "")
+              + (cats[di] != null && cats[di] !== "" ? cats[di] + ": " : "") + v + suffix;
+            els.push(h("rect", {
+              key: "b" + si + "-" + di,
+              x: x,
+              y: Math.min(yTopBar, yBotBar),
+              width: barW,
+              height: Math.abs(yBotBar - yTopBar),
+              fill: color,
+              rx: 2,
+            },
+              h("title", null, tip)));
+            if (showValues) {
+              els.push(h("text", {
+                key: "v" + si + "-" + di,
+                className: "cv-chart-value",
+                x: x + barW / 2,
+                y: yTopBar - 4,
+                textAnchor: "middle",
+              }, String(v) + suffix));
+            }
+          });
+        });
+        cats.forEach(function (label, i) {
+          els.push(h("text", {
+            key: "l" + i,
+            className: "cv-chart-label",
+            x: xFor(i) + groupW / 2,
+            y: height - 7,
+            textAnchor: "middle",
+          }, String(label)));
+        });
+        (props.referenceLines || []).forEach(function (ref, i) {
+          if (ref && ref.value != null) {
+            var y = yFor(Number(ref.value));
+            els.push(h("line", { key: "r" + i, className: "cv-chart-ref", x1: padL, x2: width - padR, y1: y, y2: y }));
+            if (ref.label) {
+              els.push(h("text", { key: "rl" + i, className: "cv-chart-ref-label", x: padL + 4, y: y - 3 }, ref.label));
+            }
+          }
+        });
+        var colors = series.map(function (s, si) { return category[s.color] || s.color || theme.palette[si % theme.palette.length]; });
+        return h("div", { style: props.style },
+          seriesLegend(series, colors),
+          unsupportedBadge(props, ["stacked"]),
+          h("svg", {
+            className: "cv-chart",
+            viewBox: "0 0 " + width + " " + height,
+            role: "img",
+            "aria-label": "柱状图：" + (cats.join("、") || "无数据"),
+          }, els),
+        );
+      }
+
+      function LineChart(props) {
+        var series = normalizeSeries(props);
+        var height = props.height || 160;
+        var width = props.width || 420;
+        var suffix = props.valueSuffix || "";
+        var beginAtZero = props.beginAtZero !== false;
+        var values = [];
+        series.forEach(function (s) {
+          (s.data || []).forEach(function (d) { values.push(numOf(d)); });
+        });
+        var dataMax = Math.max.apply(null, values.concat([1]));
+        var dataMin = Math.min.apply(null, values.concat([0]));
+        var yMax = props.yMax != null ? Number(props.yMax) : dataMax;
+        var yMin = props.yMin != null ? Number(props.yMin) : (beginAtZero ? 0 : Math.min(dataMin, 0));
+        if (yMax <= yMin) yMax = yMin + 1;
+        var spanY = yMax - yMin;
+        var padL = 30;
+        var padR = 6;
+        var plotTop = 14;
+        var plotBottom = height - 24;
+        var plotH = Math.max(plotBottom - plotTop, 1);
+        var tickInfo = niceTicks(Math.max(Math.abs(yMax), Math.abs(yMin), 1), 4);
+        var tickValues = tickInfo.ticks.filter(function (t) {
+          return t >= yMin - spanY * 0.001 && t <= yMax + spanY * 0.001;
+        });
+        var yFor = function (v) { return plotBottom - ((v - yMin) / spanY) * plotH; };
+        var xFor = function (i, n) { return padL + (i * (width - padL - padR)) / Math.max(n - 1, 1); };
+        var els = [];
+        tickValues.forEach(function (t) {
+          var y = yFor(t);
+          els.push(h("line", { key: "g" + t, className: "cv-chart-grid", x1: padL, x2: width - padR, y1: y, y2: y }));
+          els.push(h("text", { key: "t" + t, className: "cv-chart-tick", x: padL - 5, y: y + 3, textAnchor: "end" }, String(t)));
+        });
+        series.forEach(function (s, si) {
+          var color = category[s.color] || s.color || theme.palette[si % theme.palette.length];
+          var data = s.data || [];
+          if (!data.length) return;
+          var pts = data.map(function (d, i) {
+            var v = numOf(d);
+            return xFor(i, data.length) + "," + yFor(v);
+          });
+          els.push(h("polyline", {
+            key: "p" + si,
+            fill: "none",
+            stroke: color,
+            strokeWidth: 2,
+            points: pts.join(" "),
+          }));
+          if (props.showValues !== false && data.length <= 12) {
+            data.forEach(function (d, i) {
+              var v = numOf(d);
+              els.push(h("text", {
+                key: "v" + si + "-" + i,
+                className: "cv-chart-value",
+                x: xFor(i, data.length),
+                y: yFor(v) - 5,
+                textAnchor: "middle",
+              }, String(v) + suffix));
+            });
+          }
+          // Per-point hover targets: native <title> tooltips without a JS layer.
+          data.forEach(function (d, i) {
+            var v = numOf(d);
+            var label = d && (d.label != null ? d.label : (d.x != null ? d.x : null));
+            var tip = (series.length > 1 && s.name ? s.name + " · " : "")
+              + (label != null ? label + ": " : "#" + (i + 1) + ": ") + v + suffix;
+            els.push(h("circle", {
+              key: "h" + si + "-" + i,
+              cx: xFor(i, data.length),
+              cy: yFor(v),
+              r: 7,
+              fill: "transparent",
+            },
+              h("title", null, tip)));
+          });
+        });
+        (props.referenceLines || []).forEach(function (ref, i) {
+          if (ref && ref.value != null) {
+            var y = yFor(Number(ref.value));
+            els.push(h("line", { key: "r" + i, className: "cv-chart-ref", x1: padL, x2: width - padR, y1: y, y2: y }));
+            if (ref.label) {
+              els.push(h("text", { key: "rl" + i, className: "cv-chart-ref-label", x: padL + 4, y: y - 3 }, ref.label));
+            }
+          }
+        });
+        var colors = series.map(function (s, si) { return category[s.color] || s.color || theme.palette[si % theme.palette.length]; });
+        return h("div", { style: props.style },
+          seriesLegend(series, colors),
+          unsupportedBadge(props, ["stacked"]),
+          h("svg", {
+            className: "cv-chart",
+            viewBox: "0 0 " + width + " " + height,
+            role: "img",
+            "aria-label": "折线图：" + (series.map(function (s) { return s.name; }).filter(Boolean).join("、") || "无数据"),
+          }, els),
+        );
+      }
+
+      function PieChart(props) {
+        var data = props.data || props.segments || [];
+        var size = props.size || 140;
+        var suffix = props.valueSuffix || "";
+        var cx = size / 2;
+        var cy = size / 2;
+        var r = size / 2 - 4;
+        var total = data.reduce(function (sum, d) { return sum + (Number(d.value) || 0); }, 0) || 1;
+        var angle = -Math.PI / 2;
+        var paths = data.map(function (d, i) {
+          var value = Number(d.value) || 0;
+          var slice = (value / total) * Math.PI * 2;
+          var x1 = cx + r * Math.cos(angle);
+          var y1 = cy + r * Math.sin(angle);
+          angle += slice;
+          var x2 = cx + r * Math.cos(angle);
+          var y2 = cy + r * Math.sin(angle);
+          var large = slice > Math.PI ? 1 : 0;
+          var color = category[d.color] || d.color || theme.palette[i % theme.palette.length];
+          var path = ["M", cx, cy, "L", x1, y1, "A", r, r, 0, large, 1, x2, y2, "Z"].join(" ");
+          var pct = total ? Math.round(value / total * 100) : 0;
+          var tip = (d.label || d.name || ("项 " + (i + 1))) + ": " + value + suffix + " (" + pct + "%)";
+          return h("path", { key: i, d: path, fill: color },
+            h("title", null, tip));
+        });
+        var legend = h("div", { className: "cv-chart-legend" },
+          data.map(function (d, i) {
+            var color = category[d.color] || d.color || theme.palette[i % theme.palette.length];
+            var pct = total ? Math.round((Number(d.value) || 0) / total * 100) : 0;
+            return h("span", { key: i },
+              h("i", { style: { background: color } }),
+              (d.label || d.name || ("项 " + (i + 1))) + " · " + (Number(d.value) || 0) + suffix + " (" + pct + "%)",
+            );
+          }),
+        );
+        return h("div", { style: props.style },
+          legend,
+          unsupportedBadge(props, ["doughnut", "donut", "innerRadius"]),
+          h("svg", {
+            className: "cv-chart",
+            width: size,
+            height: size,
+            viewBox: "0 0 " + size + " " + size,
+            role: "img",
+            "aria-label": "饼图",
+          }, paths),
+        );
+      }
+
+      function CollapsibleSection(props) {
+        var openState = ReactLib.useState(props.defaultOpen !== false);
+        var open = openState[0];
+        var setOpen = openState[1];
+        return h("div", { className: "cv-collapse", style: props.style },
+          h("button", {
+            type: "button",
+            className: "cv-collapse-h",
+            "aria-expanded": open ? "true" : "false",
+            onClick: function () { setOpen(!open); },
+          },
+            h("span", { "aria-hidden": "true" }, open ? "▾" : "▸"),
+            h("span", { style: { flex: 1, fontWeight: 590 } }, props.title || props.header),
+            props.trailing || null,
+          ),
+          open ? h("div", { className: "cv-collapse-b" }, props.children) : null,
+        );
+      }
+
+      return {
+        Stack: Stack, Row: Row, Grid: Grid,
+        H1: H1, H2: H2, H3: H3, Text: Text, Pill: Pill, Stat: Stat,
+        Card: Card, CardHeader: CardHeader, CardBody: CardBody,
+        Callout: Callout, Code: Code, Divider: Divider, Spacer: Spacer,
+        Button: Button, Link: Link, Table: Table,
+        TodoList: TodoList, TodoListCard: TodoListCard,
+        Swatch: Swatch, UsageBar: UsageBar,
+        BarChart: BarChart, LineChart: LineChart, PieChart: PieChart,
+        CollapsibleSection: CollapsibleSection,
+        mergeStyle: mergeStyle,
+        useHostTheme: useHostTheme,
+        useCanvasState: useCanvasState,
+        useCanvasAction: useCanvasAction,
+        useState: ReactLib.useState,
+        useMemo: ReactLib.useMemo,
+        useEffect: ReactLib.useEffect,
+        useRef: ReactLib.useRef,
+        useCallback: ReactLib.useCallback,
+        useId: ReactLib.useId,
+        computeDAGLayout: computeDAGLayout,
+        Fragment: ReactLib.Fragment,
+        categoryPaletteDark: category,
+        colorPalette: category,
+      };
+    }
+
+    var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    function vlqDecode(str) {
+      var result = [];
+      var shift = 0;
+      var value = 0;
+      for (var i = 0; i < str.length; i++) {
+        var digit = B64.indexOf(str[i]);
+        var cont = digit & 32;
+        value += (digit & 31) << shift;
+        if (cont) {
+          shift += 5;
+        } else {
+          var negate = value & 1;
+          value >>>= 1;
+          result.push(negate ? -value : value);
+          value = 0;
+          shift = 0;
+        }
+      }
+      return result;
+    }
+
+    /**
+     * Map a runtime stack frame (line/col in the compiled string) back to the
+     * original .canvas.tsx using the sucrase-generated source map. mapOffset is
+     * the number of prelude lines before the sucrase output.
+     */
+    function createSourceMapper(sourceMap, mapOffset) {
+      if (!sourceMap || typeof sourceMap.mappings !== "string") return null;
+      var lines = sourceMap.mappings.split(";");
+      var sources = sourceMap.sources || [];
+      var file = sourceMap.file || "compiled.js";
+      return function (stackLine, stackCol) {
+        var genLine = stackLine - (mapOffset || 0);
+        if (genLine < 0 || genLine >= lines.length) return null;
+        var srcIdx = 0;
+        var srcLine = 0;
+        var srcCol = 0;
+        var best = null;
+        var col0 = Math.max(0, (stackCol || 1) - 1);
+        for (var li = 0; li <= genLine; li++) {
+          var segs = (lines[li] || "").split(",");
+          for (var k = 0; k < segs.length; k++) {
+            var seg = segs[k];
+            if (!seg) continue;
+            var f = vlqDecode(seg);
+            if (!f.length) continue;
+            if (f.length >= 4) {
+              srcIdx += f[1] || 0;
+              srcLine += f[2] || 0;
+              srcCol += f[3] || 0;
+            }
+            if (li === genLine && f[0] <= col0) {
+              best = { source: sources[srcIdx] || file, line: srcLine + 1, column: srcCol + 1 };
+            }
+          }
+        }
+        return best;
+      };
+    }
+
+    function mapRenderError(error, mapper) {
+      if (!mapper || !error) return null;
+      var stack = error && error.stack ? String(error.stack) : "";
+      var fm = stack.match(/<anonymous>:?(\d+):(\d+)/) || stack.match(/:?(\d+):(\d+)/);
+      if (!fm) return null;
+      var loc = mapper(Number(fm[1]), Number(fm[2]));
+      if (!loc) return null;
+      var src = loc.source.replace(/^\/Users\/[^/]+/, "~");
+      return src + ":" + loc.line + ":" + loc.column;
+    }
+    function ErrorBox(props) {
+      return h("div", { className: "dsh-cv-err" }, props.message || "Render failed");
+    }
+
+    class Boundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { error: error };
+      }
+      componentDidCatch() {}
+      componentDidUpdate(prev) {
+        if (prev.resetKey !== this.props.resetKey && this.state.error) {
+          this.setState({ error: null });
+        }
+      }
+      render() {
+        if (this.state.error) {
+          var msg = String(this.state.error && this.state.error.message || this.state.error);
+          var mapped = mapRenderError(this.state.error, this.props.mapper);
+          return h(ErrorBox, { message: mapped ? msg + "\n↳ " + mapped : msg });
+        }
+        return this.props.children;
+      }
+    }
+
+    var TOKEN_SEL = "[data-dsh-cv-root],[data-dsh-cv-canvas],[data-dsh-cv-lib],[data-dsh-cv-tail]";
+    var sandboxBundlePromise = null;
+    function getSandboxBundle() {
+      if (!sandboxBundlePromise) {
+        sandboxBundlePromise = apiGet(API + "/sandbox").catch(function (err) {
+          return { available: false, reason: String(err && err.message || err) };
+        });
+      }
+      return sandboxBundlePromise;
+    }
+    function jsonSafe(value) {
+      return JSON.stringify(value).replace(/<\//g, "<\\/");
+    }
+    function escAttr(value) {
+      return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    }

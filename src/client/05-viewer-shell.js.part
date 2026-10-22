@@ -1,0 +1,888 @@
+    /* @client-module viewer-shell: tabs, editor, window chrome, and fallback */
+    function printableSnapshot(html) {
+      if (typeof html !== "string" || new Blob([html]).size > 1024 * 1024) throw new Error("报告超过打印快照上限");
+      var template = document.createElement("template");
+      template.innerHTML = html;
+      var tags = new Set("div span p section article header footer main h1 h2 h3 h4 h5 h6 strong b em i small ul ol li table thead tbody tfoot tr th td caption pre code blockquote br hr img svg g path rect circle ellipse line polyline polygon text tspan title desc".split(" "));
+      var attrs = new Set("class colspan rowspan viewBox d x y x1 x2 y1 y2 cx cy r rx ry width height points transform fill stroke stroke-width text-anchor dominant-baseline font-size font-weight opacity role aria-label".toLowerCase().split(" "));
+      var styles = new Set("display flex-direction flex-wrap flex-grow gap grid-template-columns align-items justify-content padding margin width height max-width min-width color background background-color border border-radius font-size font-weight line-height text-align white-space overflow-wrap".split(" "));
+      var count = 0;
+      function clean(node) {
+        if (++count > 12000) throw new Error("报告节点过多，请缩小导出范围");
+        if (node.nodeType === 3) return document.createTextNode(node.textContent);
+        if (node.nodeType !== 1) return null;
+        var tag = node.localName.toLowerCase();
+        if (!tags.has(tag)) {
+          if (["script", "style", "iframe", "object", "embed", "template", "input", "select", "textarea"].indexOf(tag) >= 0) return null;
+          var fragment = document.createDocumentFragment();
+          Array.from(node.childNodes).forEach(function (child) { var safe = clean(child); if (safe) fragment.appendChild(safe); });
+          return fragment;
+        }
+        var out = node.namespaceURI === "http://www.w3.org/2000/svg" ? document.createElementNS(node.namespaceURI, tag) : document.createElement(tag);
+        Array.from(node.attributes).forEach(function (attr) {
+          if (attrs.has(attr.name.toLowerCase()) && !/url\s*\(|javascript:|expression\s*\(/i.test(attr.value) && attr.value.length < 100000) out.setAttribute(attr.name, attr.value);
+        });
+        if (tag === "img" && /^data:image\/(png|jpeg|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i.test(node.getAttribute("src") || "")) out.setAttribute("src", node.getAttribute("src"));
+        for (var i = 0; i < node.style.length; i++) {
+          var key = node.style[i], value = node.style.getPropertyValue(key);
+          if (styles.has(key) && value.length < 300 && !/url\s*\(|expression|@|javascript:|fixed|sticky/i.test(value)) out.style.setProperty(key, value);
+        }
+        Array.from(node.childNodes).forEach(function (child) { var safe = clean(child); if (safe) out.appendChild(safe); });
+        return out;
+      }
+      var wrapper = document.createElement("div");
+      Array.from(template.content.childNodes).forEach(function (node) { var safe = clean(node); if (safe) wrapper.appendChild(safe); });
+      return '<!doctype html><html data-dsh-cv-theme="light"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; style-src &#39;unsafe-inline&#39;; form-action &#39;none&#39;; base-uri &#39;none&#39;"><style>' + css + '\nhtml,body{background:#fff!important;color:#111!important;margin:0}body{padding:24px}svg,img{max-width:100%}table{break-inside:auto}tr,.cv-card,.cv-stat{break-inside:avoid}details{display:block}@page{margin:14mm}@media print{body{padding:0}}</style><div data-dsh-cv-canvas>' + wrapper.innerHTML + '</div>';
+    }
+    var DRAFT_KEY = "dsh-cv-drafts-v1";
+    var DRAFT_MAX_BYTES = 1024 * 1024;
+    function readDrafts() {
+      try {
+        var data = JSON.parse(window.localStorage.getItem(DRAFT_KEY) || "[]");
+        return Array.isArray(data) ? data.filter(function (d) {
+          return d && typeof d.path === "string" && typeof d.editor === "string" && typeof d.baseSource === "string"
+            && typeof d.baseRevision === "string" && Number.isFinite(d.updatedAt) && Date.now() - d.updatedAt < 7 * 86400000;
+        }).slice(0, 10) : [];
+      } catch { return []; }
+    }
+    function storeDraft(tab, remove) {
+      try {
+        var rows = readDrafts().filter(function (d) { return d.path !== tab.path; });
+        if (!remove && (tab.dirty || tab.savePending)) rows.unshift({ path: tab.path, editor: tab.editor, baseSource: tab.baseSource || "", baseRevision: tab.baseRevision || "", updatedAt: Date.now() });
+        rows = rows.slice(0, 10);
+        var value = JSON.stringify(rows);
+        while (rows.length > 1 && new Blob([value]).size > DRAFT_MAX_BYTES) { rows.pop(); value = JSON.stringify(rows); }
+        if (new Blob([value]).size > DRAFT_MAX_BYTES) return false;
+        window.localStorage.setItem(DRAFT_KEY, value);
+        return true;
+      } catch { return false; }
+    }
+    function mergeCanvasDoc(old, payload, savedEditor) {
+      var merged = Object.assign({}, old || {}, payload);
+      var editor = old && old.editor;
+      if (old && (old.dirty || old.savePending || (savedEditor !== undefined && editor != null)) && (savedEditor === undefined || editor !== savedEditor)) {
+        merged.editor = editor;
+        merged.dirty = editor !== payload.source;
+        merged.baseSource = savedEditor === undefined && merged.dirty ? old.baseSource : payload.source;
+        merged.baseRevision = savedEditor === undefined && merged.dirty ? old.baseRevision : payload.revision;
+        merged.conflict = merged.dirty && savedEditor === undefined && !!old.baseRevision && old.baseRevision !== payload.revision;
+      } else {
+        merged.editor = null;
+        merged.dirty = false;
+        merged.baseSource = payload.source;
+        merged.baseRevision = payload.revision;
+        merged.conflict = false;
+        merged.recovered = false;
+      }
+      return merged;
+    }
+    function ViewerShell() {
+      // Multi-canvas tabs: each tab is one open doc {payload..., editor, dirty}.
+      var _tabs = useState([]);
+      var tabs = _tabs[0];
+      var setTabs = _tabs[1];
+      var _active = useState(0);
+      var activeIdx = _active[0];
+      var setActive = _active[1];
+      var closedSeqs = useRef({});
+      var activateRef = useRef(null);
+      var doc = activeIdx < tabs.length ? tabs[activeIdx] : null;
+      var savedPos = null;
+      try {
+        savedPos = JSON.parse(window.localStorage.getItem("dsh-cv-pos") || "null");
+      } catch {
+        savedPos = null;
+      }
+      var defaultPos = {
+        top: 48,
+        left: Math.max(16, Math.round((window.innerWidth - Math.min(880, window.innerWidth - 40)) / 2)),
+        width: Math.min(880, Math.max(480, window.innerWidth - 40)),
+        height: Math.min(720, Math.round(window.innerHeight * 0.78)),
+      };
+      var _pos = useState(function () {
+        return Object.assign({}, defaultPos, savedPos && typeof savedPos.top === "number" ? savedPos : {});
+      });
+      var pos = _pos[0];
+      var setPos = _pos[1];
+      var _max = useState(false);
+      var maximized = _max[0];
+      var setMaximized = _max[1];
+      var _collapsed = useState(false);
+      var collapsed = _collapsed[0];
+      var setCollapsed = _collapsed[1];
+      var _zoom = useState(function () {
+        var savedZoom = 100;
+        try { savedZoom = Number(window.localStorage.getItem("dsh-cv-zoom")) || 100; } catch { /* ignore */ }
+        return Math.max(70, Math.min(140, savedZoom));
+      });
+      var zoom = _zoom[0];
+      var setZoom = _zoom[1];
+      var _copied = useState(false);
+      var copied = _copied[0];
+      var setCopied = _copied[1];
+      var drag = useRef(null);
+      var winRef = useRef(null);
+      var lastFocused = useRef(null);
+      var copyTimer = useRef(0);
+      var toastApi = useToast();
+      var _mode = useState("");
+      var renderMode = _mode[0];
+      var setRenderMode = _mode[1];
+      var _showSrc = useState(false);
+      var showSrc = _showSrc[0];
+      var setShowSrc = _showSrc[1];
+      var _saves = useState({});
+      var saves = _saves[0];
+      var setSaves = _saves[1];
+      var saveLocks = useRef({});
+      var saving = !!(doc && saves[doc.path]);
+      var _pendingClose = useState("");
+      var pendingClose = _pendingClose[0];
+      var setPendingClose = _pendingClose[1];
+      var draftWarning = useRef(false);
+      var printBridge = useRef(null);
+      var printPending = useRef(null);
+      var printTimer = useRef(0);
+      var printFrame = useRef(null);
+      var _print = useState(""); var printHtml = _print[0]; var setPrintHtml = _print[1];
+      var _printBusy = useState(false); var printBusy = _printBusy[0]; var setPrintBusy = _printBusy[1];
+      var _printReady = useState(false); var printReady = _printReady[0]; var setPrintReady = _printReady[1];
+      var onBridgeReady = useCallback(function (bridge) { printBridge.current = bridge; }, []);
+      var onSnapshot = useCallback(function (snapshot) {
+        if (!printPending.current || snapshot.requestId !== printPending.current) return;
+        printPending.current = null;
+        window.clearTimeout(printTimer.current);
+        setPrintBusy(false);
+        try { setPrintReady(false); setPrintHtml(printableSnapshot(snapshot.html)); }
+        catch (error) { toastApi.show("导出失败：" + error.message); }
+      }, [toastApi.show]);
+      useEffect(function () {
+        printPending.current = null; setPrintBusy(false); setPrintHtml(""); window.clearTimeout(printTimer.current);
+        return function () { printPending.current = null; window.clearTimeout(printTimer.current); };
+      }, [doc && doc.path, doc && doc.revision]);
+      var preparePrint = function () {
+        var id = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+        printPending.current = id;
+        if (!printBridge.current || !printBridge.current(id)) { printPending.current = null; toastApi.show("请等待沙箱渲染完成后导出"); return; }
+        setPrintBusy(true);
+        printTimer.current = window.setTimeout(function () { printPending.current = null; setPrintBusy(false); toastApi.show("导出超时，请重试"); }, 5000);
+      };
+      var editorSrc = doc && doc.editor != null ? doc.editor : ((doc && doc.source) || "");
+      // editorDirty derives from actual buffer content below; a previous
+      // doc.dirty snapshot here was immediately shadowed and never read.
+      useEffect(function () {
+        var onAction = function (event) {
+          var a = event && event.detail;
+          var type = a && a.type ? String(a.type) : "action";
+          var path = a && a.path ? String(a.path) : "";
+          toastApi.show("只读预览 · " + type + (path ? " · " + path : ""));
+        };
+        window.addEventListener("dsh:canvas:action", onAction);
+        return function () { window.removeEventListener("dsh:canvas:action", onAction); };
+      }, [toastApi.show]);
+      var finishClose = useCallback(function (path) {
+        var i = tabs.findIndex(function (t) { return t.path === path; });
+        if (i < 0 || saveLocks.current[path]) return;
+        closedSeqs.current[path] = tabs[i].seq || 0;
+        setTabs(function (prev) { return prev.filter(function (t) { return t.path !== path; }); });
+        setActive(function (cur) { return Math.max(0, Math.min(cur - (i < cur ? 1 : 0), tabs.length - 2)); });
+        setPendingClose("");
+        setCopied(false);
+      }, [tabs]);
+      var closeTabByIndex = useCallback(function (i, event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        var t = tabs[i];
+        if (!t) return;
+        if (saveLocks.current[t.path]) { toastApi.show("正在保存，请稍后关闭"); return; }
+        if (t.dirty) { setPendingClose(t.path); return; }
+        finishClose(t.path);
+      }, [tabs, finishClose, toastApi.show]);
+
+      var close = useCallback(function (event) {
+        closeTabByIndex(activeIdx, event);
+      }, [closeTabByIndex, activeIdx]);
+
+      // SandboxedMount registers its message listeners once at mount, so any
+      // callback captured there is frozen forever. Esc must route through a
+      // ref to the CURRENT close, or after switching tabs it closes whatever
+      // tab index was current when the sandbox first mounted.
+      var closeRef = useRef(close);
+      useEffect(function () { closeRef.current = close; }, [close]);
+      var escForSandbox = useCallback(function () { if (closeRef.current) closeRef.current(); }, []);
+
+      var applyDoc = useCallback(function (payload, opts) {
+        if (!payload || !payload.path) return;
+        var path = payload.path;
+        if (payload.seq && payload.seq <= (closedSeqs.current[path] || 0)) return;
+        var savedEditor = opts && opts.savedEditor;
+        var recovered = !opts || !opts.skipDraft ? readDrafts().find(function (d) { return d.path === path; }) : null;
+        setTabs(function (prev) {
+          var idx = -1;
+          for (var i = 0; i < prev.length; i++) {
+            if (prev[i].path === path) { idx = i; break; }
+          }
+          if (idx >= 0) {
+            var old = prev[idx];
+            if (payload.seq && old.seq && payload.seq <= old.seq && savedEditor === undefined) return prev;
+            var merged = mergeCanvasDoc(old, payload, savedEditor);
+            if (payload.seq && old.seq && payload.seq < old.seq && savedEditor !== undefined) {
+              merged = Object.assign({}, old, { editor: old.editor == null ? savedEditor : old.editor, baseSource: payload.source, baseRevision: payload.revision });
+              merged.dirty = merged.editor !== old.source;
+              merged.conflict = merged.dirty && payload.revision !== old.revision;
+            }
+            var next = prev.slice();
+            next[idx] = merged;
+            return next;
+          }
+          var added = mergeCanvasDoc(null, payload);
+          if (recovered && recovered.editor !== payload.source) {
+            added.editor = recovered.editor;
+            added.dirty = true;
+            added.baseSource = recovered.baseSource;
+            added.baseRevision = recovered.baseRevision;
+            added.recovered = true;
+            added.conflict = recovered.baseRevision !== payload.revision;
+          }
+          return prev.concat([added]);
+        });
+        if (opts && opts.activate) activateRef.current = path;
+      }, []);
+
+      // opening a canvas activates its tab (hot reloads update silently)
+      useEffect(function () {
+        var want = activateRef.current;
+        if (!want) return;
+        activateRef.current = null;
+        for (var i = 0; i < tabs.length; i++) {
+          if (tabs[i].path === want) { setActive(i); break; }
+        }
+      }, [tabs]);
+
+      var openPath = useCallback(function (path) {
+        var norm = normalizeCanvasRef(path) || path;
+        delete closedSeqs.current[norm];
+        fetch(API + "/open", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ path: path }),
+        }).then(function (res) { return res.json(); }).then(function (payload) {
+          if (payload && payload.ok === false) throw new Error(payload.error || "open failed");
+          if (payload && payload.path) delete closedSeqs.current[payload.path];
+          applyDoc(payload, { activate: true });
+        }).catch(function (err) {
+          applyDoc({
+            seq: 0,
+            path: norm,
+            title: norm.split("/").pop(),
+            source: "",
+            compiled: "",
+            error: String(err && err.message || err),
+          }, { activate: true });
+        });
+      }, [applyDoc]);
+
+      var saveSource = useCallback(function () {
+        if (!doc || !doc.path || saveLocks.current[doc.path]) return;
+        var path = doc.path;
+        var submitted = editorSrc;
+        if (!doc.baseRevision) { toastApi.show("缺少文件版本，请重新打开报告后保存"); return; }
+        setTabs(function (prev) { return prev.map(function (t) { return t.path === path ? Object.assign({}, t, { savePending: true }) : t; }); });
+        saveLocks.current[path] = true;
+        setPendingClose("");
+        setSaves(function (prev) { return Object.assign({}, prev, { [path]: true }); });
+        fetch(API + "/save", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ path: path, source: submitted, baseRevision: doc.baseRevision }),
+        }).then(function (res) { return res.json().then(function (payload) {
+          if (res.status === 409) {
+            setTabs(function (prev) { return prev.map(function (t) { return t.path === path ? Object.assign({}, t, { conflict: true }) : t; }); });
+            throw new Error("磁盘已有新版本；草稿已保留，请先查看磁盘版本");
+          }
+          if (!res.ok || !payload || payload.ok === false) throw new Error((payload && payload.error) || "save failed");
+          return payload;
+        }); }).then(function (payload) {
+          applyDoc(payload, { savedEditor: submitted });
+          toastApi.show(payload.error ? "已保存，但编译失败：" + payload.error : "已保存 · 已重编译");
+        }).catch(function (err) {
+          toastApi.show("保存失败：" + String(err && err.message || err));
+        }).finally(function () {
+          delete saveLocks.current[path];
+          setTabs(function (prev) { return prev.map(function (t) { return t.path === path ? Object.assign({}, t, { savePending: false }) : t; }); });
+          setSaves(function (prev) { var next = Object.assign({}, prev); delete next[path]; return next; });
+        });
+      }, [doc, editorSrc, applyDoc, toastApi.show]);
+
+      useEffect(function () {
+        var failed = false;
+        tabs.filter(function (tab) { return !tab.dirty && !tab.savePending; }).forEach(function (tab) { if (!storeDraft(tab, true)) failed = true; });
+        tabs.filter(function (tab) { return tab.dirty || tab.savePending; }).forEach(function (tab) { if (!storeDraft(tab, false)) failed = true; });
+        if (failed && !draftWarning.current) { toastApi.show("草稿缓存已满或不可用，请保存或下载草稿"); draftWarning.current = true; }
+      }, [tabs, toastApi.show]);
+      useEffect(function () {
+        if (!tabs.some(function (t) { return t.dirty || t.savePending; })) return undefined;
+        var warn = function (event) { event.preventDefault(); event.returnValue = ""; };
+        window.addEventListener("beforeunload", warn);
+        return function () { window.removeEventListener("beforeunload", warn); };
+      }, [tabs]);
+
+      // Hot reload: subscribe per open path; the host pushes recompiled payloads.
+      useEffect(function () {
+        if (!doc || !doc.path) return undefined;
+        var path = doc.path;
+        var es;
+        try {
+          es = new EventSource(API + "/watch?path=" + encodeURIComponent(path));
+        } catch {
+          return undefined;
+        }
+        es.onmessage = function (event) {
+          var msg = null;
+          try { msg = JSON.parse(event.data); } catch { return; }
+          if (msg.type === "reload" && msg.payload && msg.payload.path === path) {
+            applyDoc(msg.payload);
+          } else if (msg.type === "deleted") {
+            toastApi.show("源文件已被删除");
+          }
+        };
+        return function () { es.close(); };
+      }, [doc && doc.path, applyDoc, toastApi.show]);
+
+      useEffect(function () {
+        ensureCss();
+        externalOpen = openPath;
+        var onClick = function (event) {
+          var path = pathFromEvent(event);
+          if (!path) return;
+          event.preventDefault();
+          event.stopPropagation();
+          openPath(path);
+        };
+        var onKey = function (event) {
+          if (event.key === "Escape") close();
+        };
+        document.addEventListener("click", onClick, true);
+        window.addEventListener("keydown", onKey);
+        return function () {
+          if (externalOpen === openPath) externalOpen = null;
+          document.removeEventListener("click", onClick, true);
+          window.removeEventListener("keydown", onKey);
+        };
+      }, [applyDoc, openPath, close]);
+
+      useEffect(function () {
+        try {
+          window.localStorage.setItem("dsh-cv-pos", JSON.stringify(pos));
+        } catch {
+          // ignore storage errors
+        }
+      }, [pos]);
+
+      useEffect(function () {
+        try { window.localStorage.setItem("dsh-cv-zoom", String(zoom)); } catch { /* ignore */ }
+      }, [zoom]);
+
+      // Dialog a11y: move focus into the window on open, restore on close.
+      useEffect(function () {
+        if (doc) {
+          lastFocused.current = document.activeElement;
+          var node = winRef.current;
+          if (node) {
+            // Focus the dialog plane, not a destructive action. This announces
+            // the new context without painting a keyboard focus ring during a
+            // pointer-open transition; Tab still reaches both close controls.
+            node.focus();
+          }
+        } else if (lastFocused.current && lastFocused.current.focus) {
+          lastFocused.current.focus();
+          lastFocused.current = null;
+        }
+      }, [doc]);
+
+      var onBarDown = function (event) {
+        if (event.button !== 0) return;
+        if (maximized) return;
+        if (event.target && event.target.closest && event.target.closest("button")) return;
+        drag.current = {
+          kind: "move",
+          x: event.clientX,
+          y: event.clientY,
+          left: pos.left,
+          top: pos.top,
+        };
+        if (winRef.current) winRef.current.setAttribute("data-dragging", "1");
+        event.preventDefault();
+      };
+      var onBarToggleMax = function (event) {
+        if (event.target && event.target.closest && event.target.closest("button")) return;
+        setCollapsed(false);
+        setMaximized(function (prev) { return !prev; });
+      };
+      useEffect(function () {
+        var onMove = function (event) {
+          var d = drag.current;
+          if (!d) return;
+          var dx = event.clientX - d.x;
+          var dy = event.clientY - d.y;
+          if (d.kind === "move") {
+            setPos(function (prev) {
+              return Object.assign({}, prev, {
+                left: Math.max(8, d.left + dx),
+                top: Math.max(8, d.top + dy),
+              });
+            });
+          }
+        };
+        var onUp = function () {
+          drag.current = null;
+          if (winRef.current) winRef.current.removeAttribute("data-dragging");
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        return function () {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+        };
+      }, []);
+
+      var copySource = function (event) {
+        if (event) event.stopPropagation();
+        if (!doc || !doc.source) return;
+        var done = function () {
+          setCopied(true);
+          window.clearTimeout(copyTimer.current);
+          copyTimer.current = window.setTimeout(function () { setCopied(false); }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(doc.source).then(done, done);
+        } else {
+          done();
+        }
+      };
+      var downloadSource = function (event, draft) {
+        if (event) event.stopPropagation();
+        if (!doc) return;
+        var blob = new Blob([draft ? editorSrc : doc.source], { type: "text/plain;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = doc.title || "report.canvas.tsx";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      };
+      var stopDrag = function (event) { event.stopPropagation(); };
+      var toggleCollapsed = function (event) {
+        if (event) event.stopPropagation();
+        setMaximized(false);
+        setCollapsed(function (prev) { return !prev; });
+      };
+      var toggleMaximized = function (event) {
+        if (event) event.stopPropagation();
+        setCollapsed(false);
+        setMaximized(function (prev) { return !prev; });
+      };
+      var adjustZoom = function (delta) {
+        setZoom(function (value) { return Math.max(70, Math.min(140, value + delta)); });
+      };
+
+      if (!doc) return h("span", { "data-dsh-cv-idle": "" });
+
+      var shortPath = (doc.path || "").replace(/^\/Users\/[^/]+/, "~");
+
+      var editorDirty = !!doc.dirty;
+      var closingTab = tabs.find(function (t) { return t.path === pendingClose; });
+      var editorBytes = 0;
+      try { editorBytes = new Blob([editorSrc]).size; } catch { editorBytes = editorSrc.length; }
+      var editorMeta = (editorSrc ? editorSrc.split("\n").length : 0) + " 行 · " + formatBytes(editorBytes);
+
+      return h("div", {
+        className: "dsh-cv-win",
+        "data-dsh-cv-root": "",
+        "data-max": maximized ? "1" : "0",
+        "data-collapsed": collapsed ? "1" : "0",
+        role: "dialog",
+        // aria-modal intentionally omitted: the host app's mobile stylesheet targets
+        // [aria-modal="true"]:has(> :first-child > :last-child > button) as its own nav
+        // sheets, which our header-actions dialog would match and get forced into
+        // absolute positioning on small screens. role=dialog + manual focus management
+        // below preserve dialog semantics.
+        "aria-label": (doc.title || "Canvas") + " 报告",
+        ref: winRef,
+        tabIndex: -1,
+        style: maximized
+          ? { top: "8px", left: "8px", width: "calc(100vw - 16px)", height: "calc(100vh - 16px)" }
+          : {
+              top: pos.top + "px",
+              left: pos.left + "px",
+              width: pos.width + "px",
+              height: pos.height + "px",
+            },
+      },
+        h("div", { className: "dsh-cv-bar", onMouseDown: onBarDown, onDoubleClick: onBarToggleMax, title: "拖动移动 · 双击最大化/还原" },
+          h("div", { className: "dsh-cv-traffic", onMouseDown: stopDrag, "aria-label": "窗口控制" },
+            h("button", {
+              type: "button",
+              className: "dsh-cv-traffic-btn dsh-cv-window-close",
+              "data-kind": "close",
+              title: "关闭",
+              "aria-label": "关闭",
+              onClick: close,
+            }, h("span", { "aria-hidden": "true" }, "×")),
+            h("button", {
+              type: "button",
+              className: "dsh-cv-traffic-btn",
+              "data-kind": "minimize",
+              title: collapsed ? "展开" : "收起",
+              "aria-label": collapsed ? "展开窗口" : "收起窗口",
+              onClick: toggleCollapsed,
+            }, h("span", { "aria-hidden": "true" }, "−")),
+            h("button", {
+              type: "button",
+              className: "dsh-cv-traffic-btn",
+              "data-kind": "zoom",
+              title: maximized ? "还原" : "最大化",
+              "aria-label": maximized ? "还原窗口" : "最大化窗口",
+              onClick: toggleMaximized,
+            }, h("span", { "aria-hidden": "true" }, maximized ? "◆" : "+")),
+          ),
+          h("div", { className: "dsh-cv-titlewrap" },
+            h("div", { className: "dsh-cv-title" }, doc.title || "Canvas"),
+            h("div", { className: "dsh-cv-sub", title: doc.path }, shortPath),
+          ),
+          h("div", { className: "dsh-cv-chips", onMouseDown: stopDrag },
+            renderMode === "sandbox" ? h("span", { className: "dsh-cv-chip", "data-tone": "ok" }, "沙箱渲染") : null,
+            renderMode === "legacy" ? h("span", { className: "dsh-cv-chip", "data-tone": "info" }, "兼容渲染") : null,
+          ),
+          h("div", { className: "dsh-cv-actions", onMouseDown: stopDrag },
+            h("div", { className: "dsh-cv-toolgroup", "aria-label": "画布缩放" },
+              h("button", { type: "button", className: "dsh-cv-btn", title: "缩小", "aria-label": "缩小画布", disabled: zoom <= 70, onClick: function () { adjustZoom(-10); } }, "−"),
+              h("button", { type: "button", className: "dsh-cv-btn dsh-cv-zoom-value", title: "恢复 100%", "aria-label": "当前缩放 " + zoom + "% · 点击恢复", onClick: function () { setZoom(100); } }, zoom + "%"),
+              h("button", { type: "button", className: "dsh-cv-btn", title: "放大", "aria-label": "放大画布", disabled: zoom >= 140, onClick: function () { adjustZoom(10); } }, "+"),
+            ),
+            h("div", { className: "dsh-cv-toolgroup", "aria-label": "画布工具" },
+              h("button", {
+                type: "button",
+                className: "dsh-cv-btn",
+                "data-icon": "1",
+                title: "切换浅色/深色主题",
+                "aria-label": "切换主题",
+                onClick: toggleTheme,
+              }, "◐"),
+              h("button", {
+                type: "button",
+                className: "dsh-cv-btn",
+                "data-icon": "1",
+                "data-active": showSrc ? "1" : "0",
+                title: "源码 / 渲染分栏（保存即重编译）",
+                "aria-label": editorDirty ? "源码（有未保存修改）" : "源码",
+                "aria-pressed": showSrc ? "true" : "false",
+                onClick: function () { setShowSrc(!showSrc); },
+              }, editorDirty ? "</>•" : "</>"),
+              h("button", {
+                type: "button",
+                className: "dsh-cv-btn",
+                "data-icon": "1",
+                "data-copied": copied ? "1" : "0",
+                title: copied ? "已复制" : "复制源码",
+                "aria-label": copied ? "已复制源码" : "复制源码",
+                onClick: copySource,
+              }, copied ? "✓" : "⧉"),
+              h("button", { type: "button", className: "dsh-cv-btn", title: "打印当前可见报告 / 另存为 PDF", "aria-label": "打印或导出 PDF", disabled: printBusy || renderMode !== "sandbox", onClick: preparePrint }, printBusy ? "准备中…" : "PDF"),
+              h("button", { type: "button", className: "dsh-cv-btn", "data-icon": "1", title: "下载源码", "aria-label": "下载源码", onClick: downloadSource }, "↓"),
+            ),
+            h("button", {
+              type: "button",
+              className: "dsh-cv-explicit-close",
+              title: "关闭 Canvas",
+              "aria-label": "关闭 Canvas",
+              onClick: close,
+            }, "×"),
+          ),
+        ),
+        tabs.length > 1 ? h("div", { className: "dsh-cv-tabs", role: "tablist", "aria-label": "已打开的画布" },
+          tabs.map(function (t, i) {
+            return h("div", {
+              key: t.path,
+              className: "dsh-cv-tab",
+              role: "tab",
+              "data-active": i === activeIdx ? "1" : "0",
+              "aria-selected": i === activeIdx ? "true" : "false",
+              title: t.path,
+              onClick: function () { setActive(i); },
+            },
+              h("span", { className: "dsh-cv-tab-name" }, (t.title || t.path).replace(/\.canvas\.tsx$/, "")),
+              t.dirty ? h("span", { className: "dsh-cv-tab-dirty", "aria-hidden": "true" }, "●") : null,
+              h("button", {
+                type: "button",
+                className: "dsh-cv-tab-close",
+                "aria-label": "关闭 " + (t.title || t.path),
+                onClick: function (event) { closeTabByIndex(i, event); },
+              }, "×"),
+            );
+          }),
+        ) : null,
+        closingTab ? h("div", { className: "dsh-cv-notice", role: "alertdialog", "aria-label": "未保存修改", "aria-describedby": "dsh-cv-close-warning" },
+          h("span", { id: "dsh-cv-close-warning" }, (closingTab.title || "报告") + " 有未保存修改。"),
+          h("button", { type: "button", className: "dsh-cv-btn", autoFocus: true, onClick: function () { setPendingClose(""); } }, "继续编辑"),
+          h("button", { type: "button", className: "dsh-cv-btn", onClick: function () {
+            if (!storeDraft(closingTab, false)) { toastApi.show("草稿缓存失败，未关闭；请先下载草稿"); return; }
+            finishClose(closingTab.path);
+          } }, "保留草稿并关闭"),
+          h("button", { type: "button", className: "dsh-cv-btn", onClick: function () { storeDraft(closingTab, true); finishClose(closingTab.path); } }, "放弃修改并关闭"),
+        ) : null,
+        doc.recovered ? h("div", { className: "dsh-cv-notice", role: "status" }, "已恢复本浏览器草稿；保存前请核对内容。",
+          h("button", { type: "button", className: "dsh-cv-btn", onClick: function () { setShowSrc(true); } }, "查看草稿")) : null,
+        doc.conflict ? h("div", { className: "dsh-cv-notice", role: "alert" }, "磁盘版本已变化，保存已保护。",
+          h("button", { type: "button", className: "dsh-cv-btn", onClick: function () { setShowSrc(true); openPath(doc.path); } }, "查看磁盘版本")) : null,
+        h("div", { className: "dsh-cv-body", "data-dsh-cv-canvas": "", "data-split": showSrc ? "1" : "0" },
+          h("div", { className: "dsh-cv-render", style: showSrc ? undefined : { width: "100%", height: "100%" } },
+            h(CanvasMount, {
+              path: doc.path, source: doc.source, compiled: doc.compiled, moduleCode: doc.moduleCode,
+              sourceMap: doc.sourceMap, mapOffset: doc.mapOffset, error: doc.error,
+              onMode: setRenderMode, onEsc: escForSandbox, onBridgeReady: onBridgeReady,
+              onSnapshot: onSnapshot, theme: themeNow(), zoom: zoom,
+            })),
+          showSrc ? h("div", { className: "dsh-cv-editor" },
+            doc.conflict ? h("details", { className: "dsh-cv-conflict" },
+              h("summary", null, "对比磁盘版本与草稿"),
+              h("div", null, "磁盘最新版本（左侧预览）"), h("pre", null, doc.source),
+              h("button", { type: "button", className: "dsh-cv-btn", onClick: function () {
+                setTabs(function (prev) { return prev.map(function (t) { return t.path === doc.path ? Object.assign({}, t, { baseRevision: t.revision, baseSource: t.source, conflict: false }) : t; }); });
+                toastApi.show("已确认以磁盘版本为基准；下一次保存会写入当前草稿");
+              } }, "已核对，使用当前草稿替换此磁盘版本"),
+            ) : null,
+            h("textarea", {
+              className: "dsh-cv-src-edit",
+              value: editorSrc,
+              spellCheck: false,
+              "aria-label": "canvas 源码编辑",
+              onChange: function (event) {
+                var value = event.target.value;
+                setTabs(function (prev) {
+                  if (activeIdx >= prev.length) return prev;
+                  var next = prev.slice();
+                  var old = prev[activeIdx];
+                  var dirty = value !== old.source;
+                  next[activeIdx] = Object.assign({}, old, { editor: value, dirty: dirty }, dirty ? {} : { baseSource: old.source, baseRevision: old.revision, conflict: false, recovered: false });
+                  return next;
+                });
+              },
+              onKeyDown: function (event) {
+                if ((event.metaKey || event.ctrlKey) && (event.key === "s" || event.key === "S")) {
+                  event.preventDefault();
+                  saveSource();
+                } else if (event.key === "Escape") {
+                  // Editing Esc must not close the window and lose the buffer.
+                  event.stopPropagation();
+                }
+              },
+            }),
+            h("div", { className: "dsh-cv-editor-meta" },
+              h("span", null, editorMeta),
+              h("span", null, editorDirty ? "未保存" : "已同步"),
+              h("button", { type: "button", className: "dsh-cv-btn", onClick: function (event) { downloadSource(event, true); } }, "下载草稿"),
+              h("button", {
+                type: "button",
+                className: "dsh-cv-btn",
+                disabled: saving || !editorDirty || !!doc.conflict,
+                onClick: saveSource,
+              }, saving ? "保存中…" : "保存 ⌘S"),
+            ),
+          ) : null,
+        ),
+        printHtml ? h("div", { className: "dsh-cv-print-preview", role: "dialog", "aria-label": "打印预览" },
+          h("div", { className: "dsh-cv-notice" },
+            h("span", null, "仅导出当前可见内容；隐藏标签/折叠内容不包含，部分交互样式简化。"),
+            h("button", { type: "button", className: "dsh-cv-btn", disabled: !printReady, onClick: function () { try { printFrame.current.contentWindow.focus(); printFrame.current.contentWindow.print(); } catch { toastApi.show("浏览器不支持打印，请使用浏览器打印功能"); } } }, "打印 / 另存为 PDF"),
+            h("button", { type: "button", className: "dsh-cv-btn", onClick: function () { setPrintHtml(""); } }, "关闭打印预览")),
+          h("iframe", { ref: printFrame, title: "静态报告打印预览", sandbox: "allow-same-origin allow-modals", srcDoc: printHtml, onLoad: function () { setPrintReady(true); } }),
+        ) : null,
+        toastApi.toast ? h("div", { className: "dsh-cv-toast", role: "status" }, toastApi.toast) : null,
+      );
+    }
+
+    function formatBytes(n) {
+      if (!n) return "0 B";
+      if (n < 1024) return n + " B";
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+      return (n / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    function formatTime(ms) {
+      if (!ms) return "—";
+      try {
+        return new Date(ms).toLocaleString();
+      } catch {
+        return String(ms);
+      }
+    }
+
+    function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      return Promise.reject(new Error("clipboard unavailable"));
+    }
+
+    function apiGet(path) {
+      return fetch(path).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok || body.ok === false) throw new Error((body && body.error) || ("HTTP " + res.status));
+          return body;
+        });
+      });
+    }
+
+    // Intentionally removed (D1): refreshBudget() fetched /capabilities into a
+    // budgetState global that nothing ever consumed — the gallery already gets
+    // per-row budget status from every /list and /history payload.
+
+    function apiPost(path, body) {
+      return fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body || {}),
+      }).then(function (res) {
+        return res.json().then(function (payload) {
+          if (!res.ok || payload.ok === false) throw new Error((payload && payload.error) || ("HTTP " + res.status));
+          return payload;
+        });
+      });
+    }
+
+    // Keep uploads UI-only and local: decode in the browser, resize once, then
+    // send a bounded data URI to the host's asset endpoint. Canvas reports still
+    // reference the stable `asset://name.webp` name; the iframe never gets a
+    // network capability or an arbitrary file path.
+    function compressAsset(file) {
+      return new Promise(function (resolve, reject) {
+        if (!file || !/^image\//i.test(file.type || "")) { reject(new Error("请选择图片文件")); return; }
+        var reader = new FileReader();
+        reader.onerror = function () { reject(new Error("读取图片失败")); };
+        reader.onload = function () {
+          var image = new Image();
+          image.onerror = function () { reject(new Error("图片解码失败")); };
+          image.onload = function () {
+            var max = 1600;
+            var scale = Math.min(1, max / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+            var canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+            canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+            var ctx = canvas.getContext("2d");
+            if (!ctx) { reject(new Error("浏览器不支持图片压缩")); return; }
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            var data = canvas.toDataURL("image/webp", 0.82);
+            var stem = String(file.name || "image").replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]+/g, "-") || "image";
+            resolve({ name: stem + ".webp", data: data });
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function canvasPathFromArgs(raw) {
+      try {
+        // Harness core records arguments as a JSON string; stay tolerant of a
+        // pre-parsed object if a future shell hands that over.
+        var obj = typeof raw === "string" ? JSON.parse(raw || "{}") : (raw && typeof raw === "object" ? raw : {});
+        return typeof obj.path === "string" ? normalizeCanvasRef(obj.path) : "";
+      } catch {
+        return "";
+      }
+    }
+
+    function addCanvasPaths(state, paths, seq) {
+      var out = state.paths.slice();
+      paths.forEach(function (raw) {
+        var path = normalizeCanvasRef(raw);
+        if (path && !out.some(function (row) { return row.path === path; })) {
+          out.push({ path: path, seq: seq });
+        }
+      });
+      return { turn: state.turn, paths: out };
+    }
+
+    // Any canvas ref is eligible: the host tool already validated HOME + suffix
+    // before a successful result, and bare names resolve against the canvas dir.
+    function isDshCanvasText(path) {
+      return !!path;
+    }
+
+    // Bubble rule: a tail appears only for view_canvas calls that SUCCEEDED.
+    // tool/call carries callId+arguments; tool/result carries message.{callId,isError}.
+    // Recording on the result (not the call) keeps failed calls — e.g. a
+    // placeholder path for a file that was never written — from faking a bubble.
+    var canvasReportsDefinition = {
+      kind: "canvas-reports",
+      match: function (event) {
+        if (event.type === "turn/start") {
+          return { id: String(event.data.turn), role: "start" };
+        }
+        if (event.type === "tool/call" && event.data.name === "view_canvas") {
+          return { id: String(event.data.turn), role: "update" };
+        }
+        if (event.type === "tool/result") {
+          // results carry no tool name; update() resolves them via pending callIds
+          return { id: String(event.data.turn), role: "update" };
+        }
+        return null;
+      },
+      start: function (_context, match) {
+        return { turn: match.event.data.turn, paths: [], pending: {} };
+      },
+      update: function (context, match) {
+        var ev = match.event;
+        var state = context.state || { turn: ev.data.turn, paths: [], pending: {} };
+        if (ev.type === "tool/call" && ev.data.name === "view_canvas") {
+          var path = canvasPathFromArgs(ev.data.arguments);
+          if (!path || !isDshCanvasText(path)) return state;
+          var pending = Object.assign({}, state.pending);
+          pending[ev.data.callId] = { path: path, seq: ev.seq };
+          return Object.assign({}, state, { pending: pending });
+        }
+        if (ev.type === "tool/result") {
+          var msg = ev.data.message;
+          // Message shape per core/llm createToolResultMessage: callId lives in
+          // source.callId (and content[0].toolCallId), isError in content[0].
+          var callId = msg && msg.source && msg.source.kind === "tool" ? msg.source.callId
+            : (msg && Array.isArray(msg.content) && msg.content[0] && msg.content[0].toolCallId) || (msg ? msg.callId : undefined);
+          var isError = !!((msg && Array.isArray(msg.content) && msg.content[0] && msg.content[0].isError) || (msg && msg.isError));
+          var entry = callId && state.pending ? state.pending[callId] : null;
+          if (!entry) return state;
+          var pending2 = Object.assign({}, state.pending);
+          delete pending2[callId];
+          if (isError) {
+            // failed registration (missing file, hard budget, outside HOME): no bubble
+            return Object.assign({}, state, { pending: pending2 });
+          }
+          var merged = addCanvasPaths({ turn: state.turn, paths: state.paths }, [entry.path], entry.seq);
+          return Object.assign({}, state, { pending: pending2, paths: merged.paths });
+        }
+        return state;
+      },
+      buildLocationData: function (context, scope) {
+        if (scope !== "turn" || !context.state) return null;
+        return {
+          kind: "turn",
+          turn: context.state.turn,
+          key: "canvas-reports",
+          value: { paths: context.state.paths },
+        };
+      },
+    };
+
+    function selectCanvasPaths(owner) {
+      try {
+        var data = owner.turn && owner.turn.data ? owner.turn.data.get("canvas-reports") : undefined;
+        if (!data || !Array.isArray(data.paths)) return null;
+        var paths = data.paths
+          .filter(function (row) { return row && row.path && row.seq <= owner.seq; })
+          .map(function (row) { return row.path; });
+        return paths.length ? paths : null;
+      } catch {
+        return null;
+      }
+    }

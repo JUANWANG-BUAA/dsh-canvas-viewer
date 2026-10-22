@@ -1,7 +1,8 @@
 # dsh-canvas-viewer SDK subset
 
-Authoritative for agents writing `.canvas.tsx` files for `dsh-canvas-viewer`.
-New files import from `"dsh/canvas"`; the Host accepts `cursor/canvas` only as a legacy shim.
+This subset applies only when deliberately authoring **trusted Web `.canvas.tsx`**. Prefer data-only `.canvas.json` for native TUI + Web; its exact schema is in [report-data.md](report-data.md), not this SDK. JSON cannot import components, pass arbitrary props, render images/HTML or install callbacks. Native TUI never executes TSX.
+
+New TSX files import from `"dsh/canvas"`; the Host accepts `cursor/canvas` only as a legacy shim.
 
 ```ts
 import {
@@ -43,11 +44,13 @@ import {
 ## State & interaction
 
 - `useCanvasState(key, initial)` — key-scoped state: scoped per canvas mount (two canvases using the same key never collide) and per key within one canvas. Returns `[value, setter]`; the setter accepts a value or updater function. No `key` behaves like `useState`.
-- `useCanvasAction()` — returns `dispatch(action)` that fires a real `dsh:canvas:action` window event; the viewer surfaces it as a toast. Reports are read-only, so actions are informational, not file-opening.
+- `useCanvasAction()` — returns `dispatch(action)` that fires a real `dsh:canvas:action` window event; the viewer surfaces it as a toast. These callbacks are informational, not file-opening, file-writing or arbitrary Host commands. The separate Web source editor saves through the Host protocol; this hook does not.
 
 ## Capability negotiation
 
-Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits), and `GET /api/canvas/assets/raw?name=...` serves only managed image assets for gallery thumbnails. `view_canvas` returns `lines`/`bytes`/estimated tokens. Target **≤80 lines, ≤16KB, ≈≤4k source tokens**; treat 120 as the ceiling. Prefer a compact table or Stat over repeated prose. Images should use `asset://name.webp` (gallery upload resizes to WebP), not inline base64. Reports remain executable and must be trusted, even though the default iframe module path does not require `unsafe-eval`.
+Web Host exposes `GET /api/canvas/capabilities` (machine-readable components/props/limits), and `GET /api/canvas/assets/raw?name=...` serves only managed images for gallery thumbnails. `view_canvas`, when exposed, returns `lines`/`bytes`/estimated tokens. Target **≤80 lines, ≤16 KB, ≈≤4k source tokens** as authoring guidance; actual configured budgets and the 1,500,000-byte reader ceiling are separate. Prefer a compact table or Stat over repeated prose. Only Web TSX materializes recognized quoted `asset://name.webp` literals (gallery uploads resize to WebP); JSON treats them as text. Do not use computed asset names, remote images or inline base64. TSX remains executable and must be trusted: the default iframe module path needs no `unsafe-eval`, but explicit compatibility mode executes in the Host page realm.
+
+Web source editing saves the original format with `baseRevision`; HTTP 409 requires comparing the retained draft to the latest disk version. Saving source does not prove validation/rendering succeeded. TUI is read-only and has none of this SDK's interactive callbacks.
 
 ## DAG
 

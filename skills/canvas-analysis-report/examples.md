@@ -1,6 +1,6 @@
 # Worked patterns
 
-Numbers and names must come from the current repo. Runtime = **dsh-canvas-viewer** subset ([sdk.md](sdk.md)).
+Numbers and names must come from current evidence; never claim tests or CI passed merely because scripts exist. Default to `.canvas.json` for native TUI + Web using [report-data.md](report-data.md). Use sections, metrics, callouts, tables and lists. The Card/Stat/tab/SVG patterns below are optional **trusted Web TSX** ([sdk.md](sdk.md)); they do not add capabilities to JSON or native TUI.
 
 ## Investigation / optimization
 
@@ -8,13 +8,13 @@ Numbers and names must come from the current repo. Runtime = **dsh-canvas-viewer
 - Callout = the most likely misread.
 - Tabs = user-felt axes, not folders.
 - P0 Card = named file + one-line fix.
-- After write: `view_canvas` + short chat with absolute-path link.
+- After writing either format: call `view_canvas` only if exposed; check the result, then give a short verdict and absolute-path link. If absent, still deliver the file and say the tool is not exposed—not that the Web plugin is unmounted. Native TUI readers open `/canvas` or `/canvas <path.canvas.json>`.
 
 ## Design / architecture
 
 - H1 = product boundary sentence.
 - 做/不做 = two Cards.
-- DAG = `computeDAGLayout` + SVG, ≤8 nodes.
+- JSON architecture = node/edge and lifecycle tables; an `unsupported` block can explain an omitted visual. Optional Web TSX DAG = `computeDAGLayout` + SVG, ≤8 nodes.
 - Stats = constraints, not vanity KPIs.
 
 ## Genre picker

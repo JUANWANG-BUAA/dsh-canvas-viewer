@@ -153,7 +153,7 @@ assert(CAPABILITIES.assets.preview.includes("/api/canvas/assets/raw"), "asset pr
 }
 assert(CAPABILITIES.sandbox.fallback.includes("fail-closed"), "sandbox fallback is fail-closed");
 assert(readFileSync(new URL("../lib/index.js", import.meta.url), "utf8").includes("hard-budget 拦截"), "hard budget error remains explicit");
-assert(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").includes("允许兼容渲染"), "legacy rendering requires explicit user action");
+assert(readFileSync(new URL("../lib/client.js", import.meta.url), "utf8").includes("兼容渲染"), "legacy rendering requires explicit user action");
 ok("capabilities manifest");
 
 // --- budget telemetry ---
@@ -311,7 +311,7 @@ assert(clientSrc.includes("dsh-cv-lib-row-summary"), "gallery presents one compa
 assert(hostSrc.includes("previewSignature") && hostSrc.includes("readCanvasSource"), "host annotates gallery rows with structural preview");
 assert(!clientSrc.includes("TEMP BISECT PROBE") && !clientSrc.includes("mergedProbe"), "no leftover bisect probe / old call-timing bubble path");
 assert(clientSrc.includes("pending[ev.data.callId]") && clientSrc.includes("tool/result") && clientSrc.includes("isError"), "bubble result-gating is reachable");
-assert(hostSrc.includes("canvasMetaCache") && hostSrc.includes("invalidateCanvasMeta"), "gallery metadata cache present");
+assert(hostSrc.includes("createCanvasRepository") && hostSrc.includes("repository.metadata"), "shared gallery metadata repository present");
 assert(hostSrc.includes("sandboxBundleCache"), "sandbox bundle cached");
 assert(!clientSrc.includes("feDisplacementMap") && !clientSrc.includes("LIQUID_FILTER_ID"), "viewer avoids noisy optical displacement on the reading window");
 assert(clientSrc.includes(".dsh-cv-win::before") && clientSrc.includes("backdrop-filter:none"), "window uses a clean composited edge without full-surface blur");

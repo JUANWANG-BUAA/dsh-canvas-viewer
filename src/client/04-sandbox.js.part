@@ -1,0 +1,348 @@
+    /* @client-module sandbox: iframe CSP, Blob modules, and MessageChannel */
+    var readerPositions = new Map();
+    // Runs only in the opaque-origin iframe. Report DOM stays out of the parent.
+    function installSandboxReader() {
+      var root = document.getElementById("cv-root"), nav = document.createElement("nav");
+      nav.id = "cv-reader";
+      nav.setAttribute("aria-label", "报告阅读工具");
+      nav.style.cssText = "position:sticky;top:0;z-index:2147483647;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:var(--cv-editor);border-bottom:1px solid var(--cv-stroke-1);color:var(--cv-fg);font:12px system-ui";
+      function control(tag, label) {
+        var el = document.createElement(tag);
+        el.setAttribute("aria-label", label);
+        el.style.cssText = "max-width:220px;padding:4px 6px;border:1px solid var(--cv-stroke-1);border-radius:5px;background:var(--cv-editor);color:var(--cv-fg);font:inherit";
+        nav.appendChild(el); return el;
+      }
+      var outline = control("select", "报告目录"), find = control("input", "查找报告正文");
+      find.type = "search"; find.placeholder = "查找正文"; find.maxLength = 256;
+      var next = control("button", "查找下一处"), result = control("span", "查找结果");
+      next.type = "button"; next.textContent = "下一处"; result.setAttribute("role", "status");
+      document.body.insertBefore(nav, root);
+      var headings = [], lastQuery = "", lastNode = null, lastOffset = 0, restoreTop = 0, ready = false;
+      function visible(el) {
+        return el && !el.closest("[hidden],[aria-hidden='true']") && el.getClientRects().length > 0 && window.getComputedStyle(el).visibility !== "hidden";
+      }
+      function refreshOutline() {
+        var selected = outline.value === "" ? null : headings[Number(outline.value)];
+        headings = Array.prototype.filter.call(root.querySelectorAll("h1,h2,h3,h4,h5,h6"), visible).slice(0, 200);
+        outline.textContent = "";
+        var prompt = document.createElement("option"); prompt.value = ""; prompt.textContent = "报告目录"; outline.appendChild(prompt);
+        headings.forEach(function (heading, index) {
+          var option = document.createElement("option"); option.value = String(index); option.textContent = (heading.textContent || "未命名章节").trim().slice(0, 120); outline.appendChild(option);
+        });
+        var index = headings.indexOf(selected); outline.value = index < 0 ? "" : String(index);
+      }
+      outline.addEventListener("focus", refreshOutline);
+      outline.addEventListener("change", function () {
+        var target = outline.value === "" ? null : headings[Number(outline.value)];
+        if (target && visible(target)) target.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+      function search() {
+        var query = find.value.trim().slice(0, 256).toLowerCase();
+        if (!query) { result.textContent = ""; return; }
+        if (query !== lastQuery) { lastNode = null; lastOffset = 0; lastQuery = query; }
+        var walker = document.createTreeWalker(root, 4), rows = [], node, budget = 5000;
+        while (budget-- > 0 && (node = walker.nextNode())) {
+          if (node.parentElement && !node.parentElement.closest("script,style,noscript") && visible(node.parentElement)) rows.push(node);
+        }
+        var start = rows.indexOf(lastNode), found = false;
+        for (var step = 0; step <= rows.length && !found; step++) {
+          node = rows[(Math.max(start, 0) + step) % rows.length];
+          if (!node) break;
+          var offset = node.textContent.toLowerCase().indexOf(query, step === 0 && start >= 0 ? lastOffset : 0);
+          if (offset < 0) continue;
+          var range = document.createRange(); range.setStart(node, offset); range.setEnd(node, offset + query.length);
+          var selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+          node.parentElement.scrollIntoView({ block: "center" });
+          lastNode = node; lastOffset = offset + query.length; found = true;
+        }
+        result.textContent = found ? "已定位" : "未找到";
+      }
+      next.addEventListener("click", search);
+      find.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); search(); } });
+      var pendingScroll = false;
+      window.addEventListener("scroll", function () {
+        if (!ready || pendingScroll) return;
+        pendingScroll = true;
+        window.requestAnimationFrame(function () { pendingScroll = false; __send({ type: "dsh-cv:reader-position", top: Math.max(0, Math.min(10000000, window.scrollY || 0)) }); });
+      }, { passive: true });
+      function restore(top) {
+        if (typeof top !== "number" || !Number.isFinite(top) || top < 0 || top > 10000000) return;
+        restoreTop = top;
+        if (ready) window.requestAnimationFrame(function () { window.scrollTo(0, restoreTop); });
+      }
+      return {
+        restore: restore,
+        ready: function () { ready = true; refreshOutline(); restore(restoreTop); },
+        snapshot: function (requestId) {
+          if (typeof requestId !== "string" || requestId.length < 1 || requestId.length > 80 || !window.__cvPort) return;
+          var clone = root.cloneNode(true), original = root.querySelectorAll("*"), copies = clone.querySelectorAll("*");
+          for (var i = copies.length - 1; i >= 0; i--) if (!visible(original[i])) copies[i].remove();
+          var html = clone.innerHTML;
+          if (html.length <= 1048576 && new Blob([html]).size <= 1048576) window.__cvPort.postMessage({ type: "dsh-cv:export-snapshot", requestId: requestId, html: html });
+        },
+      };
+    }
+    function SandboxedMount(props) {
+      var frameRef = useRef(null);
+      var _st = useState("loading");
+      var status = _st[0];
+      var setStatus = _st[1];
+      var _em = useState("");
+      var errMsg = _em[0];
+      var setErrMsg = _em[1];
+      useEffect(function () {
+        if (props.onStatus) props.onStatus(status);
+      }, [status, props.onStatus]);
+      useEffect(function () {
+        var frame = frameRef.current;
+        if (!frame) return undefined;
+        var port = null, failed = false, pendingSnapshot = null;
+        function requestSnapshot(requestId) {
+          if (failed || !port || typeof requestId !== "string" || requestId.length < 1 || requestId.length > 80) return false;
+          pendingSnapshot = requestId;
+          try { port.postMessage({ type: "dsh-cv:export-request", requestId: requestId }); return true; } catch { pendingSnapshot = null; return false; }
+        }
+        if (props.onBridgeReady) props.onBridgeReady(requestSnapshot);
+        function handle(d, privatePort) {
+          if (!d || typeof d !== "object") return;
+          if (d.type === "dsh:canvas:ready") { if (!failed) setStatus("ready"); return; }
+          if (privatePort && d.type === "dsh-cv:reader-position") {
+            if (typeof d.top === "number" && Number.isFinite(d.top) && d.top >= 0 && d.top <= 10000000) {
+              readerPositions.delete(props.path); readerPositions.set(props.path, d.top);
+              if (readerPositions.size > 50) readerPositions.delete(readerPositions.keys().next().value);
+            }
+            return;
+          }
+          if (privatePort && d.type === "dsh-cv:export-snapshot") {
+            if (pendingSnapshot && d.requestId === pendingSnapshot && typeof d.html === "string" && d.html.length <= 1048576 && new Blob([d.html]).size <= 1048576) {
+              pendingSnapshot = null;
+              if (props.onSnapshot) props.onSnapshot({ requestId: d.requestId, html: d.html });
+            }
+            return;
+          }
+          if (d.type === "dsh-cv:esc") {
+            // Esc pressed inside the sandbox: keydown never bubbles out of an
+            // iframe, so the canvas forwards it over the port instead.
+            if (props.onEsc) props.onEsc();
+            return;
+          }
+          if (d.type === "dsh:canvas:action") {
+            try {
+              window.dispatchEvent(new CustomEvent("dsh:canvas:action", { detail: d.action || {} }));
+            } catch { /* ignore */ }
+            return;
+          }
+          if (d.type === "dsh:canvas:error") {
+            failed = true;
+            pendingSnapshot = null;
+            if (props.onBridgeReady) props.onBridgeReady(null);
+            setStatus("error");
+            setErrMsg(String(d.message || "sandbox render failed"));
+          }
+        }
+        function onMsg(event) {
+          if (event.source !== frame.contentWindow) return;
+          handle(event.data);
+        }
+        // Theme changes must reach the opaque-origin iframe: the srcdoc only reads
+        // the theme once at assembly, so live toggles travel over the port.
+        function sendTheme() {
+          var msg = { type: "dsh-cv:theme", theme: themeNow() };
+          try { if (port) { port.postMessage(msg); return; } } catch { /* fall through */ }
+          try { frame.contentWindow.postMessage(msg, "*"); } catch { /* ignore */ }
+        }
+        window.addEventListener("dsh:canvas:theme", sendTheme);
+        // MessageChannel handshake: an unforgeable private port for iframe -> host
+        // messages. srcdoc listeners may not exist at the first React effect tick, so
+        // reconnect on the real iframe load event as well as attempting immediately.
+        function connect() {
+          if (port) { try { port.close(); } catch { /* ignore */ } }
+          port = null;
+          try {
+            var chan = new MessageChannel();
+            port = chan.port1;
+            port.onmessage = function (event) { handle(event.data, true); };
+            var init = { type: "dsh-cv:init", theme: themeNow() };
+            init.readerTop = readerPositions.get(props.path) || 0;
+            frame.contentWindow.postMessage(init, "*", [chan.port2]);
+          } catch { /* port unavailable -> rely on the source-checked window fallback */ }
+        }
+        frame.addEventListener("load", connect);
+        connect();
+        window.addEventListener("message", onMsg);
+        return function () {
+          failed = true;
+          pendingSnapshot = null;
+          if (props.onBridgeReady) props.onBridgeReady(null);
+          frame.removeEventListener("load", connect);
+          window.removeEventListener("message", onMsg);
+          window.removeEventListener("dsh:canvas:theme", sendTheme);
+          if (port) { try { port.close(); } catch { /* ignore */ } }
+        };
+      }, []);
+      var srcdoc = useMemo(function () {
+        if (!props.compiled) return "";
+        var cssIn = (props.css || "")
+          .replace(TOKEN_SEL, ":root")
+          .replaceAll("html[data-dsh-cv-theme='light'] [data-dsh-cv-root]", ":root[data-dsh-cv-theme='light']")
+          .replaceAll("html[data-dsh-cv-theme='light'] [data-dsh-cv-canvas]", ":root[data-dsh-cv-theme='light']")
+          .replaceAll("html[data-dsh-cv-theme='light'] [data-dsh-cv-lib]", ":root[data-dsh-cv-theme='light']")
+          .replaceAll("html[data-dsh-cv-theme='light'] [data-dsh-cv-tail]", ":root[data-dsh-cv-theme='light']");
+        var light = props.theme === "light";
+        // Opaque-origin iframes are painted onto an independent canvas by Chromium.
+        // Keep one flat, dynamic pixel base; theme changes must never reveal the page
+        // wallpaper or force the iframe to reload.
+        var readingTokensDark = "--cv-canvas-base:#171b21;--cv-editor:#171b21!important;--cv-chrome:rgba(31,34,40,.96)!important;--cv-elevated:rgba(45,48,55,.98)!important;--cv-fill-1:rgba(255,255,255,.1)!important;--cv-fill-2:rgba(255,255,255,.065)!important;--cv-fill-3:rgba(255,255,255,.045)!important;--cv-fill-4:rgba(0,0,0,.12)!important;--cv-stroke-1:rgba(255,255,255,.12)!important;--cv-stroke-2:rgba(0,0,0,.28)!important;--cv-stroke-3:rgba(255,255,255,.055)!important;--cv-fg:#f2f2f4!important;--cv-fg-2:#d0d2d7!important;--cv-fg-3:#989da5!important;--cv-fg-4:#737983!important;";
+        var readingTokensLight = "--cv-canvas-base:#f2f3f5;--cv-editor:#f2f3f5!important;--cv-chrome:rgba(252,252,253,.96)!important;--cv-elevated:#fff!important;--cv-fill-1:rgba(60,60,67,.11)!important;--cv-fill-2:rgba(60,60,67,.07)!important;--cv-fill-3:rgba(60,60,67,.045)!important;--cv-fill-4:rgba(60,60,67,.025)!important;--cv-stroke-1:rgba(60,60,67,.18)!important;--cv-stroke-2:rgba(60,60,67,.14)!important;--cv-stroke-3:rgba(60,60,67,.09)!important;--cv-fg:#1c1c1e!important;--cv-fg-2:#48484a!important;--cv-fg-3:#6e6e73!important;--cv-fg-4:#8e8e93!important;";
+        var html =
+          "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + escAttr(props.path || "canvas") + "</title>" +
+          // The default sandbox path uses Blob-backed ES modules, so compiled
+          // reports do not require unsafe-eval. Network-capable sinks stay
+          // denied by the rest of this policy.
+          "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; media-src 'none'\">" +
+          "<style>" + cssIn + "</style>" +
+          "<style>:root{" + readingTokensDark + "color-scheme:dark}:root[data-dsh-cv-theme='light']{" + readingTokensLight + "color-scheme:light}html,body{margin:0;padding:0;background:var(--cv-canvas-base)!important;scrollbar-width:none;}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;}.dsh-cv-sandbox-root{min-height:100%;background:var(--cv-canvas-base)!important;}</style>" +
+          "</head><body><div class=\"dsh-cv-sandbox-root\" id=\"cv-root\"></div>" +
+          "<script>" + props.preact + "</" + "script>" +
+          "<script>" + props.preactHooks + "</" + "script>" +
+          "<script>" + props.compat + "</" + "script>" +
+          "<script>" +
+            (light ? "document.documentElement.setAttribute('data-dsh-cv-theme','light');" : "") +
+            "var React=window.preactCompat;var ReactDOM=window.preactCompat;" +
+            "if(!ReactDOM.createRoot){ReactDOM.createRoot=function(c){return {render:function(v){return ReactDOM.render(v,c);}};};}" +
+            "var __send=function(m){if(window.__cvPort){try{window.__cvPort.postMessage(m);return;}catch(e){}}try{window.parent.postMessage(m,'*');}catch(e){}};" +
+            "var __reader=(" + installSandboxReader.toString() + ")();" +
+            "function __cvTheme(t){try{if(t==='light'){document.documentElement.setAttribute('data-dsh-cv-theme','light');}else{document.documentElement.removeAttribute('data-dsh-cv-theme');}window.dispatchEvent(new CustomEvent('dsh:canvas:themechange'));}catch(e){}}" +
+            "window.addEventListener('message',function(ev){var d=ev&&ev.data;if(!d)return;if(d.type==='dsh-cv:init'&&ev.ports&&ev.ports[0]){window.__cvPort=ev.ports[0];window.__cvPort.onmessage=function(pe){var pd=pe&&pe.data;if(pd&&pd.type==='dsh-cv:theme'){__cvTheme(pd.theme);}else if(pd&&pd.type==='dsh-cv:export-request'){__reader.snapshot(pd.requestId);}};if(window.__cvPort.start){window.__cvPort.start();}__cvTheme(d.theme);__reader.restore(d.readerTop);}else if(d.type==='dsh-cv:theme'){__cvTheme(d.theme);}},false);" +
+            "document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){ev.preventDefault();__send({type:'dsh-cv:esc'});}},false);" +
+            "function __fail(e){__send({type:'dsh:canvas:error',message:String((e&&e.message)||e||'sandbox module failed')});}" +
+            "function __loadModule(code,done){try{var u=URL.createObjectURL(new Blob([code],{type:'text/javascript'}));var s=document.createElement('script');s.type='module';s.onload=function(){URL.revokeObjectURL(u);done();};s.onerror=function(){URL.revokeObjectURL(u);__fail(new Error('sandbox module load failed'));};s.src=u;document.head.appendChild(s);}catch(e){__fail(e);}}" +
+            "var __sdkSrc=" + jsonSafe((props.sdk || "") + "\nglobalThis.__cvCreateSdk=createSdk;") + ";" +
+            "var __moduleSrc=" + jsonSafe(props.moduleCode || props.compiled) + ";" +
+            "__loadModule(__sdkSrc,function(){try{var __sdk=globalThis.__cvCreateSdk(React,React.createElement);globalThis.sdk=__sdk;globalThis.React=React;globalThis.ReactDOM=ReactDOM;globalThis.h=React.createElement;__loadModule(__moduleSrc,function(){try{var __App=globalThis.__cvCanvasApp;if(typeof __App!=='function')throw new Error('canvas module did not export a component');var __root=ReactDOM.createRoot(document.getElementById('cv-root'));__root.render(React.createElement(__App));__reader.ready();__send({type:'dsh:canvas:ready'});}catch(e){__fail(e);}});}catch(e){__fail(e);}});" +
+            "window.addEventListener('dsh:canvas:action',function(ev){__send({type:'dsh:canvas:action',action:(ev&&ev.detail)||{}});});" +
+            "window.addEventListener('error',function(ev){__fail((ev&&ev.message)||'error');});window.addEventListener('unhandledrejection',function(ev){__fail(ev&&ev.reason);});" +
+          "</" + "script>" +
+          "</body></html>";
+        return html;
+      }, [props.compiled, props.moduleCode, props.css, props.sdk, props.preact, props.preactHooks, props.compat, props.path]);
+      if (status === "error") {
+        return h("div", { className: "dsh-cv-sandbox-fallback" },
+          h("div", { className: "dsh-cv-err" }, "沙箱渲染失败：" + errMsg),
+          h("div", null, "兼容渲染会在主页面执行此报告代码，仅允许你信任的报告。"),
+          h("button", { type: "button", className: "dsh-cv-btn", onClick: props.onFallback }, "允许此报告兼容渲染"),
+        );
+      }
+      return h("iframe", {
+        ref: frameRef,
+        className: "dsh-cv-sandbox",
+        sandbox: "allow-scripts",
+        srcDoc: srcdoc,
+        title: props.path || "canvas",
+        tabIndex: -1,
+      });
+    }
+
+    function CanvasMount(props) {
+      var mapper = useMemo(function () {
+        return createSourceMapper(props.sourceMap, props.mapOffset);
+      }, [props.sourceMap, props.mapOffset]);
+      // Approval belongs to this exact report revision, never to the viewer/tab.
+      // A new identity revokes it synchronously, before effects or report code run.
+      var report = useMemo(function () { return {}; }, [props.path, props.source, props.compiled, props.moduleCode]);
+      var _sb = useState(null);
+      var sb = _sb[0];
+      var setSb = _sb[1];
+      var _approval = useState(null);
+      var allowLegacy = _approval[0] === report;
+      var setApproval = _approval[1];
+      var approveLegacy = useCallback(function () { setApproval(report); }, [report]);
+      var _status = useState(null);
+      var sandboxStatus = _status[0];
+      var setSandboxStatus = _status[1];
+      var onSandboxStatus = useCallback(function (status) {
+        setSandboxStatus({ report: report, status: status });
+      }, [report]);
+      var legacySdk = useMemo(function () {
+        if (!allowLegacy) return null;
+        var made = createSdk(React);
+        try { Object.freeze(made); } catch { /* non-extensible environments */ }
+        return made;
+      }, [allowLegacy]);
+      var legacy = useMemo(function () {
+        if (!allowLegacy || !props.compiled) return null;
+        try {
+          var factory = new Function("React", "sdk", props.compiled);
+          var App = factory(React, legacySdk);
+          if (typeof App !== "function") throw new Error("canvas did not export a component");
+          return { App: App };
+        } catch (err) {
+          var fmsg = String(err && err.message || err);
+          var fmapped = mapRenderError(err, mapper);
+          return { error: fmapped ? fmsg + "\n↳ " + fmapped : fmsg };
+        }
+      }, [allowLegacy, props.compiled, mapper, legacySdk, report]);
+      useEffect(function () {
+        var cancelled = false;
+        if (!props.compiled || allowLegacy || sb) return undefined;
+        Promise.resolve().then(getSandboxBundle).then(function (bundle) {
+          if (cancelled) return;
+          var valid = bundle && bundle.available === true &&
+            [bundle.sdk, bundle.preact, bundle.preactHooks, bundle.compat].every(function (part) { return typeof part === "string" && part.length > 0; });
+          setSb(valid ? bundle : { available: false, reason: bundle && bundle.reason || "运行时资源缺失或无效" });
+        }, function (err) {
+          if (!cancelled) setSb({ available: false, reason: String(err && err.message || err) });
+        });
+        return function () { cancelled = true; };
+      }, [props.compiled, allowLegacy, sb]);
+      var mode = !props.compiled ? (props.error ? "error" : "source") :
+        allowLegacy ? (legacy && legacy.error ? "error" : "legacy") :
+        !sb ? "loading" : !sb.available ? "blocked" :
+        sandboxStatus && sandboxStatus.report === report ? (sandboxStatus.status === "ready" ? "sandbox" : sandboxStatus.status === "error" ? "error" : "loading") : "loading";
+      useEffect(function () {
+        if (props.onMode) props.onMode(mode);
+      }, [mode, report, props.onMode]);
+      if (!props.compiled) {
+        if (props.error) return h(ErrorBox, { message: props.error });
+        return h("pre", { className: "dsh-cv-src" }, props.source || "");
+      }
+      if (allowLegacy) {
+        if (legacy.error) return h(ErrorBox, { message: legacy.error });
+        return h("div", { "data-dsh-cv-canvas": "" },
+          h(Boundary, { resetKey: report, mapper: mapper }, h(legacy.App)),
+        );
+      }
+      if (!sb) {
+        return h("div", { className: "dsh-cv-sandbox-fallback", role: "status" }, "正在加载隔离渲染环境…");
+      }
+      if (!sb.available) {
+        return h("div", { className: "dsh-cv-sandbox-fallback" },
+          h("div", { className: "dsh-cv-err" }, "沙箱不可用：" + String(sb.reason || "运行时资源缺失")),
+          h("div", null, "兼容渲染会在主页面执行此报告代码，仅允许你信任的报告。"),
+          h("button", { type: "button", className: "dsh-cv-btn", onClick: approveLegacy }, "允许此报告兼容渲染"),
+        );
+      }
+      return h("div", {
+        className: "dsh-cv-sandbox-wrap",
+        "data-dsh-cv-canvas": "",
+        style: { "--cv-scale": String((props.zoom || 100) / 100) },
+      },
+        h(Boundary, { resetKey: report, mapper: mapper },
+          h(SandboxedMount, {
+            key: JSON.stringify([props.path, props.source, props.compiled, props.moduleCode]),
+            compiled: props.compiled,
+            moduleCode: props.moduleCode,
+            css: css,
+            sdk: sb.sdk,
+            preact: sb.preact,
+            preactHooks: sb.preactHooks,
+            compat: sb.compat,
+            path: props.path,
+            theme: props.theme,
+            onEsc: props.onEsc,
+            onStatus: onSandboxStatus,
+            onBridgeReady: props.onBridgeReady,
+            onSnapshot: props.onSnapshot,
+            onFallback: approveLegacy,
+          })));
+    }

@@ -1,55 +1,45 @@
 ---
 name: canvas-analysis-report
 description: >-
-  Produces concise .canvas.tsx investigation/design reports for dsh-canvas-viewer:
-  verdict first, evidence tables, tabs, view_canvas. Use for analysis, optimization,
-  architecture, 调查报告, 设计思路, 优化方向, 架构评审. Skip for code fixes, PRs, short answers.
+  Produces concise investigation/design reports for dsh-canvas-viewer: data-only
+  .canvas.json for TUI + Web, optional trusted Web .canvas.tsx; verdict first,
+  evidence tables. Use for analysis, optimization, architecture, 调查报告,
+  设计思路, 优化方向, 架构评审. Skip for code fixes, PRs, short answers.
 ---
 
 # Canvas analysis report (dsh-native)
 
+## Choose the reader format
+
+- **Default: native TUI + Web** — `~/.dsh/canvases/<kebab>.canvas.json`, schemaVersion 1. See [report-data.md](report-data.md). Sections, text/callouts, metrics, tables, lists and bar charts; no report code, HTML, images, active URLs or callbacks. `asset://...` is literal text.
+- **Optional trusted Web report** — `.canvas.tsx` for SDK interaction, custom SVG or managed images. See [sdk.md](sdk.md) and conditional [templates.md](templates.md). TUI shows a legacy notice, never executes it; do not promise automatic TSX/hooks/SVG conversion.
+- Web `view_canvas` accepts either format; JSON is strictly validated and rendered by a fixed template. The Web editor still edits JSON, not generated TSX. TUI is a separate read-only reader, without arbitrary HTML/images/editing/callbacks or a duplicate model tool.
+
 ## Flow
 
-1. Establish evidence, then write `~/.dsh/canvases/<kebab>.canvas.tsx`.
-2. Import only from `"dsh/canvas"`; new files never use Cursor paths.
-3. Target **≤80 lines, ≤16KB, roughly ≤4k source tokens**; 120 is a hard ceiling, not a target. Lines are a soft density signal, not a reason to delete necessary evidence. Avoid inline base64/data-URI assets.
-4. For images, prefer `<img src="asset://name.webp" />`; upload through the gallery when convenient (browser resize/WebP compression), or place trusted PNG/JPEG/GIF/WebP/AVIF files in `~/.dsh/canvas-assets/`. Host materializes them before sandbox execution; never paste base64 into the report.
-5. Treat every report as trusted executable code. The default iframe avoids `unsafe-eval`, but the explicit compatibility fallback can execute on the main thread.
-6. The gallery may show a lazy pixel thumbnail for the first referenced asset; it does not execute the report to generate thumbnails.
-7. Call **`view_canvas`** with the absolute path; chat gives a 2–4 sentence verdict and link, never duplicates the report.
+1. Establish evidence and the audience; choose JSON unless Web-only custom rendering is necessary.
+2. **JSON:** write `~/.dsh/canvases/<kebab>.canvas.json` using only [report-data.md](report-data.md). Use sections instead of interactive tabs, a boundary/edge table instead of SVG, and `unsupported` for a deliberate unrepresented feature. Do not embed imports, JSX or JavaScript.
+3. **TSX only:** write `~/.dsh/canvases/<kebab>.canvas.tsx`, import only from `"dsh/canvas"`, default-export one component. Treat this as trusted executable code: default iframe isolation is defense in depth; explicit compatibility rendering executes in the host realm. Images use direct `<img src="asset://name.webp" />` literals backed by trusted PNG/JPEG/GIF/WebP/AVIF in `~/.dsh/canvas-assets/` or gallery upload. Avoid inline base64 and remote URLs.
+4. Keep evidence dense: aim for ≤80 lines, ≤16 KB and roughly ≤4k source tokens, not empty brevity. These are authoring targets, not universal runtime ceilings; configured policy and JSON schema limits are separate. Never invent metrics or claim tests/CI passed without an actual result.
+5. If `view_canvas` is exposed, call it with the absolute file path and check the result. Otherwise still write the file, give its path, and state **the tool is not exposed in this session**; that alone does not prove the Web plugin is unmounted. In native TUI tell the user to open `/canvas` or `/canvas <path.canvas.json>`. Only invoke tools actually available.
+6. Chat gives a 2–4 sentence verdict, evidence/limits and a file link; do not duplicate the report. A file write alone is not verified rendering.
 
-## Page skeleton
+## Report skeleton
 
-```
-Stack(gap=24)
-  Pill + tertiary source line
-  H1 = sentence verdict
-  Callout (the misread)
-  Grid of 2–4 countable Stats
-  Pill tabs only when views change the decision
-  Tab bodies: H2 + Table / named Cards / one DAG ≤8
-  Footer caption: source + limits
-```
+Verdict title → source/limits → likely misread callout → 2–4 defensible metrics → decision sections with evidence tables → prioritized actions. JSON uses fixed blocks; TSX can use Stack/Grid/Stat/Card/Pill and tabs only when the views change a decision.
 
-## Genre A — investigation / audit / optimization
+### Investigation / audit / optimization
 
-Tabs: 总览 · 质量 · 体验 · 建议顺序.
+Sections: 总览 · 质量 · 体验 · 建议顺序. Include one misread, named files for high-priority issues, an evidence table and an ordered action list/priority table. TSX may use Cards/TodoListCard.
 
-Required: one misread `Callout`; P0 `Card`s with file names; one evidence `Table`; roadmap via `TodoListCard` or priority table.
+### Design / architecture
 
-## Genre B — design / architecture
-
-Tabs: 边界 · 架构 · 生命周期 · 契约.
-
-Required: explicit 做/不做 Cards; constraint Stats; `computeDAGLayout` + SVG (≤8 nodes); one lifecycle table.
+Sections: 边界 · 架构 · 生命周期 · 契约. Include 做/不做, measurable constraints and a lifecycle table. JSON expresses the architecture as nodes/edges tables; optional Web TSX may use `computeDAGLayout` + SVG (≤8 nodes).
 
 ## Rules
 
-- Only exports in [sdk.md](sdk.md) are safe; unknown Cursor-only exports break preview.
-- H1 is a sentence. One section answers one decision; tabs are user-felt axes, not folders.
-- Prefer Stat/Table/DAG to prose. Each normal text block ≤35 words; never restate a title, stat, or table in prose.
-- Color is sparse; no fake charts, invented metrics, gradients, or emoji chrome.
-- Match the user's language.
-- Prefer tables/Stats/DAG, delete empty tabs and repeated explanations. Treat `view_canvas`'s estimated token count as a diagnostic signal, not exact billing.
-- Chat leads with the answer and links the canvas; never ship only chat or only canvas.
-- If `view_canvas` is missing, still write the file and say the plugin is not mounted.
+- H1/title is a sentence verdict. Each section answers a decision; no empty sections or repeated explanations.
+- Prefer metrics/tables over prose; normal text blocks ≤35 words where practical. Do not repeat the title, metric or table in prose.
+- Use sparse color; no invented charts, gradients or emoji chrome. Match the user's language.
+- Only [sdk.md](sdk.md) exports belong to the **TSX** branch; unknown Cursor-only exports break preview. It is not a JSON props escape hatch.
+- Estimated tokens are diagnostics, not exact billing. Gallery source-search totals can be partial when `scanComplete:false`; thumbnails are static structure/first TSX asset, not executed-report screenshots.

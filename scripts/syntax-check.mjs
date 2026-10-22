@@ -16,6 +16,11 @@ const files = [
   new URL("../lib/host/hot-reload.mjs", import.meta.url),
   new URL("../lib/host/budget.mjs", import.meta.url),
   new URL("../lib/host/assets.mjs", import.meta.url),
+  new URL("../lib/report/schema.mjs", import.meta.url),
+  new URL("../lib/report/repository.mjs", import.meta.url),
+  new URL("../lib/tui/index.mjs", import.meta.url),
+  new URL("../lib/tui/reader.mjs", import.meta.url),
+  new URL("../lib/tui/store.mjs", import.meta.url),
 ].map(fileURLToPath);
 
 let failed = false;

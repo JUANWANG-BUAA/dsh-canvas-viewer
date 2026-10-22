@@ -1,3 +1,5 @@
 - insert:
     - id: canvas-viewer
       name: dsh-canvas-viewer
+    - id: canvas-viewer-tui
+      name: dsh-canvas-viewer/tui

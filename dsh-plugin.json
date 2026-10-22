@@ -1,0 +1,47 @@
+{
+  "$schema": "urn:dsh-std:manifest:0.15",
+  "manifestVersion": "0.15",
+  "id": "dsh-canvas-viewer",
+  "name": "Canvas Viewer",
+  "version": "0.6.0",
+  "facets": {
+    "host": {
+      "entry": "./lib/tui/index.mjs",
+      "apiVersion": "v1alpha1"
+    }
+  },
+  "requires": {
+    "contracts": [
+      {
+        "apiVersion": "commands.dsh/v1alpha1",
+        "kind": "Command"
+      }
+    ]
+  },
+  "permissions": [
+    {
+      "name": "commands.invoke",
+      "scope": "canvas.viewer.open"
+    }
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "canvas.viewer.open",
+        "title": "Canvas 图库与终端只读报告"
+      }
+    ],
+    "x-dsh-tui": [
+      {
+        "id": "canvas.viewer.scene",
+        "apiVersion": "tui.dsh/v1alpha1",
+        "kind": "Scene",
+        "name": "canvas-viewer",
+        "spec": {
+          "title": "Canvas 报告"
+        }
+      }
+    ]
+  },
+  "subscriptions": []
+}

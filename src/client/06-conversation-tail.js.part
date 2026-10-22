@@ -1,0 +1,44 @@
+    /* @client-module conversation-tail: successful view_canvas bubble */
+    function CanvasTurnTail(props) {
+      var paths = selectCanvasPaths(props) || [];
+      if (!paths.length) return null;
+      var primary = paths[0];
+      var name = primary.split("/").pop() || primary;
+      var displayName = name.replace(/\.canvas\.tsx$/i, "");
+      return h("div", { className: "dsh-cv-tail", "data-dsh-cv-tail": "" },
+        h("button", {
+          type: "button",
+          className: "dsh-cv-tail-open",
+          title: primary,
+          "aria-label": "打开 " + displayName,
+          onClick: function () {
+            requestOpenCanvas(primary);
+          },
+        },
+          h("span", { className: "dsh-cv-tail-icon", "aria-hidden": "true" }, "▤"),
+          h("span", { className: "dsh-cv-tail-text" },
+            h("span", { className: "dsh-cv-tail-name" }, displayName),
+            h("span", { className: "dsh-cv-tail-sub" },
+              paths.length > 1
+                ? ["共 ", String(paths.length), " 份 · 打开最早一份"].join("")
+                : "Canvas 报告",
+            ),
+          ),
+          h("span", { className: "dsh-cv-tail-cta" }, "打开"),
+        ),
+      );
+    }
+
+
+    function useToast() {
+      var state = useState("");
+      var toast = state[0];
+      var setToast = state[1];
+      var timer = useRef(0);
+      var show = useCallback(function (message) {
+        setToast(message);
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(function () { setToast(""); }, 1600);
+      }, []);
+      return { toast: toast, show: show };
+    }

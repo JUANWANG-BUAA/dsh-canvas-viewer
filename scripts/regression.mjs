@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Render regression over every .canvas.tsx in ~/.dsh/canvases.
+ * Render regression over repository fixtures (optional CANVAS_REGRESSION_DIR for trusted local reports).
  *
  * For each file: compile (sucrase) -> eval `new Function("React","sdk", …)` ->
  * renderToStaticMarkup. Catches compile errors, eval errors, runtime render
@@ -11,7 +11,7 @@
  * devDependencies; skips with a warning if neither is resolvable).
  */
 import { readFileSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { compileCanvas } from "../lib/index.js";
@@ -43,8 +43,7 @@ if (!react) {
   // The browser smoke covers the shipped Preact path. Keep this optional
   // React SSR regression runnable for full checkouts without making a minimal
   // production-oriented CI install fail before the host/sandbox checks run.
-  console.log(JSON.stringify({ skipped: true, reason: "react/react-dom not resolvable; browser smoke remains authoritative" }));
-  process.exit(0);
+  throw new Error("react/react-dom required for regression; install devDependencies");
 }
 
 const { React, renderToStaticMarkup } = react;
@@ -56,8 +55,7 @@ const clientSrc = readFileSync(new URL("../lib/client.js", import.meta.url), "ut
 const start = clientSrc.indexOf("function gapStyle(gap) {");
 const createStart = clientSrc.indexOf("function createSdk(ReactLib) {");
 if (start < 0 || createStart < 0) {
-  console.log(JSON.stringify({ skipped: true, reason: "SDK region not found in lib/client.js" }, null, 2));
-  process.exit(0);
+  throw new Error("SDK region not found in lib/client.js");
 }
 let depth = 0;
 let end = -1;
@@ -104,7 +102,7 @@ if (!globalThis.window) {
   globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 }
 
-const dir = join(homedir(), ".dsh", "canvases");
+const dir = process.env.CANVAS_REGRESSION_DIR || fileURLToPath(new URL("../fixtures/", import.meta.url));
 const failures = [];
 const importIssues = [];
 const stats = { total: 0, compiled: 0, rendered: 0, evalFailed: 0, renderFailed: 0, importIssues: 0, overBudget: 0 };
@@ -114,6 +112,7 @@ const files = (() => {
   catch { return []; }
 })();
 
+if (files.length === 0) throw new Error("regression fixture collection is empty");
 for (const file of files) {
   const full = join(dir, file);
   const source = readFileSync(full, "utf8");

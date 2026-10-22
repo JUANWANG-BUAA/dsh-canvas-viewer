@@ -1,0 +1,41 @@
+    /* @client-module cordis-entrypoint: reversible slot/effect registration */
+    function apply(ctx) {
+      ensureCss();
+      ctx.uiConversation.events.register(canvasReportsDefinition);
+
+      ctx.slots.inject("conversation.chat.turnTail", function () {
+        return ctx.slots.register({
+          name: "conversation.chat.turnTail",
+          id: "canvas-reports",
+          priority: -10,
+        }, CanvasTurnTail);
+      });
+
+      var container = document.createElement("div");
+      container.dataset.dshCanvasViewer = "";
+      document.body.appendChild(container);
+      var root = ReactDOM.createRoot(container);
+      root.render(h(ViewerShell));
+      ctx.effect(function () {
+        return function () {
+          root.unmount();
+          container.remove();
+          removeOwnedChrome();
+        };
+      }, "canvas-viewer: floating-window");
+
+      // First-level settings page (not hidden under Plugins).
+      ctx.slots.inject("settings.section", function () {
+        return ctx.slots.register({
+          name: "settings.section",
+          id: "canvas-library",
+          order: 15,
+          label: "Canvas 图库",
+        }, CanvasLibraryPage);
+      });
+
+    }
+
+    exports.apply = apply;
+    exports.inject = inject;
+    return module.exports;

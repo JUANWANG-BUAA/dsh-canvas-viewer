@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0 — Native terminal and Web readers
+
+- Add a separate `./tui` entrypoint, loader-owned manifest admission, attributed `/canvas` command and activation-scoped full-screen scene, without Web-server dependencies or bundled React.
+- Add strict versioned data-only `.canvas.json` reports shared by both readers, a complete fixture and fixed safe Web SDK generation. Existing TSX stays Web-compatible; terminal TSX is an explicit non-executing fallback.
+- Add native library/section navigation, Unicode-width-aware tables/metrics/bars, cross-section search, scroll/resize/refresh and async lifecycle guards. Fix actual host Escape flags and batched search input using real-renderer regressions.
+- Share bounded file repository/search metadata, refuse non-regular files without FIFO blocking, bound previews/cache/scans, and disclose partial TUI scans.
+- Add schema/repository/UI regressions to the default suite, plus opt-in installed-host admission, production Cordis loader cold-start and actual React terminal renderer tests. CLI/profile boot and late loader activation remain unverified.
+- Add opt-in real browser visual verification through native renderer → PTY → xterm.js; capture wide/narrow layouts, dark/light themes, search, legacy/error and resize screenshots. Keep test emulator dependencies in ignored storage.
+- Fix visual-review findings: compact narrow-screen help preserves search/Escape, invalid JSON is labeled invalid in the library, and HOME-relative paths avoid crowding report titles.
+- Update data authoring guidance and both skill mirrors; do not install, publish or modify live profiles automatically.
+
+## 0.5.0 — Report workspace foundation
+
+- Close the default-path parent execution gap: loading, rejected bundles and iframe errors fail closed; compatibility execution needs explicit, report-revision-scoped approval. Add 17 behavioral isolation/reader/bridge regressions.
+- Add iframe-local heading navigation, non-mutating body text find and bounded in-memory per-path scroll restore; source toggles no longer remount the reader.
+- Add revision-checked saves (409 on conflict), serialized plugin writes, random exclusive temporary files, immutable save acknowledgements, safe in-flight edits, dirty-close choices, expiring browser draft recovery and unload protection.
+- Search full report source before pagination; add server workspace filtering, totals/cursors, bounded metadata cache and stale-request-safe load-more UI. The source search is literal code text, not semantic search.
+- Add current-visible-content print/PDF preview: private bounded snapshot bridge, allowlist reconstruction, script-free print iframe and explicit print action. Hidden tabs/collapsed content, remote media and arbitrary interactive styles are not exported.
+- Add deterministic client source fragments/build validation while preserving the single external factory, committed runtime artifact and 180 KiB ceiling.
+- Make SSR regression fixtures mandatory and repository-owned; expand browser smoke to cover execution isolation, printing, dirty close, save-time typing, conflict review and draft recovery. Add opt-in real DSH browser integration mode with disposable profile/storage.
+- No cloud sync, live collaboration, historical revision timeline or semantic diff in this foundation release.
+
 ## 0.4.15 (2026-10-17)
 
 - **DSH 0.2.1-rc.2 验证升级**：CI `dsh-smoke` 的 Harness checkout 与文档统一到 `dsh-v0.2.1-rc.2`（`687f282e`，DeepSeek Harness 桌面 App 0.2.1 所带的版本）。插槽契约无破坏性变更：0.2.1 新增的 `inline` 槽标记与 keyed source 的 `(key, member)` 形式都是可选项，本插件不注册这两者；宿主深浅色仍由 `body[data-ds-dark-theme]` 与 `color-scheme` 双通道判定，两者在 0.2.1 均未改变。

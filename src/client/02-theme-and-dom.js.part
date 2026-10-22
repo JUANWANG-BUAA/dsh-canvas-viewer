@@ -1,0 +1,120 @@
+    /* @client-module theme-and-dom: owned chrome and theme persistence */
+    function applyTheme() {
+      var v = themeState.value === "light" ? "light" : "dark";
+      try {
+        if (v === "light") { document.documentElement.setAttribute("data-dsh-cv-theme", "light"); }
+        else { document.documentElement.removeAttribute("data-dsh-cv-theme"); }
+        // Versions before 0.4.12 persisted an independent viewer theme, which could
+        // make a light gallery appear inside a dark host dialog. Clear that stale key;
+        // each page load now begins from the actual dsh appearance.
+        window.localStorage.removeItem(THEME_KEY);
+      } catch { /* ignore storage / attribute errors */ }
+    }
+    function toggleTheme() {
+      themeState.value = themeState.value === "light" ? "dark" : "light";
+      applyTheme();
+      try { window.dispatchEvent(new CustomEvent("dsh:canvas:theme")); } catch { /* ignore */ }
+    }
+    function themeNow() { return themeState.value; }
+
+    function ensureHostThemeSync() {
+      if (hostThemeObserver || typeof MutationObserver === "undefined") return;
+      var sync = function () {
+        var next = detectHostTheme();
+        if (next === themeState.value) return;
+        themeState.value = next;
+        applyTheme();
+        try { window.dispatchEvent(new CustomEvent("dsh:canvas:theme")); } catch { /* ignore */ }
+      };
+      hostThemeObserver = new MutationObserver(sync);
+      try {
+        if (document.body) hostThemeObserver.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
+      } catch { /* observer unavailable in partial DOM environments */ }
+    }
+
+    function ensureCss() {
+      var style = document.getElementById(STYLE_ID);
+      if (!style) {
+        style = document.createElement("style");
+        style.id = STYLE_ID;
+        document.head.appendChild(style);
+      }
+      style.textContent = css;
+      applyTheme();
+      ensureHostThemeSync();
+    }
+
+    function removeOwnedChrome() {
+      var style = document.getElementById(STYLE_ID);
+      if (style) style.remove();
+      if (hostThemeObserver) hostThemeObserver.disconnect();
+      hostThemeObserver = null;
+      document.documentElement.removeAttribute("data-dsh-cv-theme");
+    }
+
+    /**
+     * Single normalization rule for every .canvas.tsx entry point (chat-bubble
+     * args, clicked text, gallery). Handles both a clean path and a ref that is
+     * embedded in free text. Mirrors the Host cleanRef().
+     */
+    function normalizeCanvasRef(value) {
+      if (typeof value !== "string") return "";
+      var trimmed = value.trim().replace(/^["'`\[\]]+|["'`\]]+$/g, "");
+      if (
+        /\.canvas\.(tsx|json)$/.test(trimmed)
+        && trimmed.length < 500
+        && trimmed.indexOf("\n") < 0
+        && trimmed.indexOf("..") < 0
+      ) {
+        return trimmed;
+      }
+      var match = trimmed.match(CANVAS_RE);
+      return match ? match[1] : "";
+    }
+
+    function pathFromEvent(event) {
+      var node = event.target;
+      if (node && node.nodeType !== 1) node = node.parentElement;
+      if (!node || !node.closest) return "";
+      if (node.closest(".dsh-cv-win") || node.closest("[data-dsh-canvas-viewer]")) return "";
+      // 1) Explicit canvas affordances only: data-canvas/data-path attributes
+      //    and real <a> links whose href is a canvas path. Titles are tooltips,
+      //    not click targets — they must never open the viewer.
+      for (var el = node; el && el !== document.body; el = el.parentElement) {
+        var dataPath = el.getAttribute && (el.getAttribute("data-canvas") || el.getAttribute("data-path"));
+        if (dataPath) {
+          var fromData = normalizeCanvasRef(dataPath);
+          if (fromData) return fromData;
+        }
+        if (el.tagName === "A") {
+          var href = el.getAttribute("href") || el.getAttribute("to");
+          if (href) {
+            var fromHref = normalizeCanvasRef(href);
+            if (fromHref) return fromHref;
+          }
+        }
+      }
+      // 2) Leaf text that is exactly a canvas path (whole text, not prose):
+      //    clicking a bare "foo.canvas.tsx" still opens, clicking a question that
+      //    merely mentions one does not.
+      if (node.childElementCount === 0) {
+        var text = (node.textContent || "").trim();
+        if (/\.canvas\.(tsx|json)/.test(text)) {
+          var fromText = normalizeCanvasRef(text);
+          if (fromText && text === fromText) return fromText;
+        }
+      }
+      return "";
+    }
+
+    function requestOpenCanvas(path) {
+      if (externalOpen) {
+        externalOpen(path);
+        return;
+      }
+      fetch(API + "/open", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: path }),
+      }).catch(function () {});
+    }

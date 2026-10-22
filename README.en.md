@@ -2,149 +2,142 @@
 
 [![CI](https://github.com/JUANWANG-BUAA/dsh-canvas-viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/JUANWANG-BUAA/dsh-canvas-viewer/actions) [![Release](https://img.shields.io/github/v/release/JUANWANG-BUAA/dsh-canvas-viewer?display_name=tag)](https://github.com/JUANWANG-BUAA/dsh-canvas-viewer/releases) [![License](https://img.shields.io/badge/license-MIT-2f6fe5.svg)](LICENSE)
 
-中文：[README.md](README.md)
+[中文](README.md) · [Documentation](docs/README.md) · [Changelog](CHANGELOG.md)
 
-Turn investigation, architecture, and design conclusions into real `.canvas.tsx` reports inside DeepSeek Harness: the conversation bubble discovers a report, the clean macOS-style window reads it on an undistorted pixel plane, the settings gallery manages it, and the sandbox renders it.
+Turn investigations, architecture reviews and design conclusions into reports inside DeepSeek Harness: **native read-only TUI + Web report workspace**, sharing local source files. This is neither a chat-image protocol nor the full Cursor Canvas runtime.
 
-![dsh-canvas-viewer product preview](docs/assets/hero.svg)
+![Web report workspace illustration](docs/assets/hero.svg)
 
-## The short version
+## 0.6.0 at a glance
 
-- **Host + Web UI + dsh skill**: this is a native plugin, not a second Canvas editor.
-- Reports stay in `~/.dsh/canvases/`; images stay in `~/.dsh/canvas-assets/`; the default workflow is local, not a remote CDN.
-- The Host validates paths, budgets, and assets before compiling. The browser renders inside an opaque-origin iframe with network disabled.
-- `asset://diagram.webp` keeps report source compact. The gallery lazy-loads the first referenced image; it does not execute an entire report just to make a thumbnail.
-- The client remains the dsh external factory. The security-sensitive asset boundary is now strict TypeScript source with a committed JavaScript runtime artifact.
-- Verified with DeepSeek Harness **0.2.1-rc.2** (`dsh-v0.2.1-rc.2`, npm `next`, the version shipped by DeepSeek Harness Desktop 0.2.1); CI includes a real DSH Web profile, one-time browser token/Cookie, and client boot-graph smoke.
+Upgrading from 0.4.15 brings:
 
-## Install in one minute
+- **Cross-reader data reports**: versioned `.canvas.json` with sections, text, callouts, metrics, tables, lists and bars. Neither reader executes report-supplied code for this format.
+- **Native terminal reader**: `/canvas` library, section navigation, cross-section find, responsive tables, scrolling and refresh. TSX shows an explicit Web-only notice, never execution or automatic conversion.
+- **Web workspace**: heading navigation/body find, page-session reading positions, full-source search and workspace pagination; revision conflicts, browser drafts and visible-content print/PDF.
+- **Engineering contracts**: shared bounded repository and strict schema; client source fragments build the same external factory, with committed runtime artifacts ready for Git installation.
 
-Replace `<40-character-commit-sha>` with a full commit SHA you have reviewed. Pinning a commit keeps a dsh profile reproducible.
+| Format / capability | Native TUI | Web |
+| --- | --- | --- |
+| `.canvas.json` (`schemaVersion: 1`) | Validated, rendered with host terminal components; read-only | Validated, converted to a fixed SDK template, read in an iframe; source editor still edits JSON |
+| `.canvas.tsx` | Legacy / not-executed notice only | Compiles and executes trusted reports; SDK subset and controlled local images |
+| Editing, drafts, printing | Not supported | Source editing, conflict review, drafts, visible-content print preview |
+| HTML / SVG / images / hooks | No execution or arbitrary rich content | TSX follows SDK/sandbox contracts, not an unrestricted browser environment |
+
+JSON rejects unknown versions, keys, block types and control sequences. HTML, URLs and `asset://` in text remain literal: no link interpretation or image loading. [Data contract](skills/canvas-analysis-report/report-data.md) · [Schema source](src/report/schema.mts) · [Complete example](fixtures/dual-reader.canvas.json)
+
+### Actual native terminal captures
+
+| Wide 100×28 | Narrow 40×24 |
+| --- | --- |
+| ![Native TUI wide report](docs/assets/tui-wide.png) | ![Native TUI narrow table](docs/assets/tui-narrow.png) |
+
+Captured through the actual host renderer → real PTY → xterm.js 6 → Edge, not an HTML reimplementation. These are not evidence of full CLI/profile boot. [Keys and verification boundaries](docs/TUI.md)
+
+## Install and activate
+
+Requires an installed DSH and the appropriate Web/TUI profile. The package declares Node.js ≥20; CI uses Node.js 22/24. Install the **Git bundle**; this does not depend on publication of a same-named npm package.
+
+Replace the placeholder with a reviewed full 40-character commit SHA:
 
 ```sh
-# GitHub / community install
-dsh plugin --profile web add github:JUANWANG-BUAA/dsh-canvas-viewer#<40-character-commit-sha>
-
-# Inspect the composed profile
+dsh plugin --profile web add "github:JUANWANG-BUAA/dsh-canvas-viewer#<40-character-commit-sha>"
 dsh --profile web --dump-config
-
-# Restart after changing the plugin set; client file edits use dsh Web HMR
 dsh web
 ```
 
-The community phrase “`dsh add`” means the `dsh plugin --profile web add` flow above. It is not a separate command that bypasses the profile. See [client architecture](docs/CLIENT-ARCHITECTURE.md) for activation and refresh boundaries.
+A release tag is a convenient alternative, e.g. `github:JUANWANG-BUAA/dsh-canvas-viewer#v0.6.0`; reproducible deployments should still pin its resolved full commit. Restart the target profile after bundle installation/removal. Use the one-time launch URL printed by `dsh web` to establish its Cookie; never log, share or reuse its token.
 
-Local development:
-
-```sh
-git clone https://github.com/JUANWANG-BUAA/dsh-canvas-viewer.git
-cd dsh-canvas-viewer
-pnpm install
-pnpm test
-bash scripts/sync-install.sh
-```
-
-If the web profile also contains unrelated GitHub SSH dependencies, scope a transport override to this refresh only; it never rewrites global Git configuration. You may also pin the npm registry explicitly:
+### Native TUI
 
 ```sh
-DSH_GIT_URL_BASE=https://github.com/ \
-DSH_NPM_REGISTRY=https://registry.npmjs.org \
-DSH_PNPM_NO_OPTIONAL=1 \
-bash scripts/sync-install.sh
+dsh plugin --profile dsh-tui add "github:JUANWANG-BUAA/dsh-canvas-viewer#<40-character-commit-sha>"
+# Restart the target TUI profile, then use its input box:
+# /canvas
+# /canvas ~/.dsh/canvases/report.canvas.json
 ```
 
-Use `DSH_PNPM_NO_OPTIONAL=1` only when the current platform does not need the profile's unrelated optional packages. The script always mutates the profile through `dsh plugin --profile web add`; it never overwrites `node_modules` directly. dsh may re-resolve unrelated profile plugins during refresh, so fix network/cache access and retry if one of those external dependencies is unreachable.
+`dsh-tui` is an example profile name; use your actual configuration. `dsh-canvas-viewer/tui` is a subpath of the same package, **not a separate npm package**:
 
-## From skill to pixels
+- `cordis.patch.yml` declares both the Web root and `./tui` rows, activated by their respective service dependencies.
+- The pure-TUI `./tui` entry hard-depends only on `commands` and `tuiScenes`, not a Web server, compiler or browser. React/UI are injected by the host.
+- The host Loader must admit `dsh-plugin.json`; `tuiPluginHost.registerCommand` then attributes the command to `canvas.viewer.open`. The manifest declares the command, Scene and scoped command permission. No private admission calls or deny bypasses. Scenes are in-process plugins, **not security sandboxes**.
 
-![dsh canvas workflow](docs/assets/workflow.svg)
+Prefer cold startup. Late admission-loader catch-up, live permission revocation and future TUI versions are not compatibility guarantees. [TUI installation contract](docs/TUI.md)
 
-| Stage | What happens | Boundary |
+### Install the authoring skill (optional)
+
+The bundle and filesystem skill are separate layers. Copy `skills/canvas-analysis-report/` to `~/.dsh/skills/canvas-analysis-report/`, then refresh skills through your host. Bundle installation alone does not install the skill.
+
+For local development, `dsh plugin --profile web add ./` uses the checkout (keep it in place). `bash scripts/sync-install.sh` copies the plugin and skill into `~/.dsh/` and refreshes the **web profile** through DSH commands; it is not a TUI installer. Process-scoped `DSH_GIT_URL_BASE` / `DSH_NPM_REGISTRY` overrides do not alter global Git configuration. If unrelated profile dependencies are unreachable, fix network/cache access rather than overwriting `node_modules`.
+
+## Three entry points, different contracts
+
+| Entry | Purpose | Not a promise of… |
 | --- | --- | --- |
-| Skill | `canvas-analysis-report` writes a compact, reproducible report | roughly 80 lines / 16KB / 4k estimated tokens |
-| Host | `view_canvas` validates HOME, budgets, compiles, and materializes `asset://` | failed calls never create a chat bubble |
-| Cordis | tools, prompt, routes, and reversible effects are registered | unload removes routes, watchers, SSE, and UI |
-| Client | the external factory injects the bubble, window, and gallery | it is not bundled into the prebuilt shell |
-| Browser | iframe sandbox + CSP + Preact compat render the report | `connect-src 'none'`, no network by default |
+| TUI `/canvas [path]` | Opens the library or an existing data report; no path scans `~/.dsh/canvases/` | Authoring, session messages, or a second `view_canvas` tool |
+| `canvas-analysis-report` skill (the host may expose `/canvas-analysis-report`) | Guides evidence gathering and authoring; JSON for both readers, TSX for rich Web interaction | A reader command; slash-skill presentation is host-owned |
+| Web `view_canvas({path})` | Called after writing a file; successful validation produces a clickable conversation-tail report card | A chat-image/screenshot attachment protocol or report pixel output |
 
-## What you get
+Chat images still use image tools or attachment protocols actually provided by the current host. Markdown images, screenshot attachments and Canvas cards are not interchangeable. Pure TUI should use only available tools, not require a nonexistent `view_canvas`.
 
-- **Conversation bubble**: only a successful `view_canvas` call appears; clicking it opens the report.
-- **Viewer window**: clean translucent macOS chrome over an opaque pixel plane, multiple tabs, 70%–140% zoom, source/render split, atomic save, hot reload, copy/download, live host-synchronized appearance, Esc close, and mobile full-screen mode.
-- **Gallery**: all/recent views, search, workspace filtering, path/Markdown/@ references, real-pixel `asset://` thumbnails, and browser-side WebP upload.
-- **Canvas SDK subset**: Stack, Grid, Table, DAG, Stats, Bar/Line/Pie, Callout, CollapsibleSection, and more; unsupported props show a degraded badge.
-- **Diagnostics**: lines, bytes, estimated tokens, inline-data/repetition warnings, soft/hard budgets, and source-mapped compile errors.
+Suggested flow: gather evidence → write `~/.dsh/canvases/<name>.canvas.json` → read with `/canvas`. Web can use the same JSON or trusted TSX followed by `view_canvas`. Keep chat to a 2–4 sentence verdict and put detailed evidence in the report. [Authoring skill](skills/canvas-analysis-report/SKILL.md) · [Web SDK subset](skills/canvas-analysis-report/sdk.md)
 
-## Local assets, intentionally not a CDN
+## Web workspace and safe editing
 
-Images are treated as controlled local dsh data rather than public static content:
+- **Read**: tabbed floating window, 70%–140% zoom, live host appearance and mobile fullscreen. Iframe-local headings/find; reading positions for up to 50 paths live only in current-page memory. Toggling source does not reload the reader.
+- **Find**: literal full-source/title/path/workspace search, filtered before pagination, with totals and stale-response protection. Not semantic search or a persistent index.
+- **Save**: Host owns source files. UI saves carry the original-byte revision; HTTP 409 retains the local draft and requires review. Plugin writes are serialized with atomic rename, not filesystem CAS against external editors. No automatic merge, history timeline or collaboration.
+- **Drafts**: dirty close offers continue/keep/discard. Typing during saves survives older responses. Drafts use current-browser/origin localStorage: 10 entries, 1 MiB total, seven-day expiry. Not server backups or device sync. Avoid shared browsers for sensitive source; uninstall does not clear drafts—discard or clear site data separately.
+- **Print/PDF**: allowlist-rebuilt, script-free preview of currently visible content, followed by explicit user print/save. Hidden tabs/collapsed content are omitted. Not a complete interactive snapshot or pixel-perfect export.
 
-```tsx
-export default function Report() {
-  return <img src="asset://architecture.webp" alt="architecture" />;
-}
-```
+[Workspace save, draft and print contracts](docs/WORKSPACE.md)
 
-- The browser scales uploads to a 1600px longest edge and compresses them to WebP. The Host accepts a single filename and a 2MB maximum.
-- The Host validates PNG/JPEG/GIF/WebP/AVIF signatures, rejecting extension-only disguises.
-- `GET /api/canvas/assets/raw` returns an `ETag`; repeated gallery opens can revalidate instead of downloading unchanged pixels. Responses include `nosniff`, same-origin isolation, and private caching.
-- Raw assets never grant the iframe network access; controlled images are inlined at compile time.
-- A remote CDN is deliberately not the default: it adds credentials, lifecycle, CORS, and privacy surfaces and weakens offline reproducibility. Team sharing should be an explicit Host provider with permissions and a remote asset protocol, not arbitrary URLs in reports.
+## Local data and trust boundaries
 
-## Token strategy
+| Data | Default location / policy |
+| --- | --- |
+| Report source | `~/.dsh/canvases/`; direct reads stay inside HOME, Web save/delete inside the managed report root |
+| TSX image assets | `~/.dsh/canvas-assets/`; use `<img src="asset://diagram.webp" />`, not inline base64 source |
+| Budget settings | `budget` in `~/.dsh/canvas-viewer/settings.json`; `soft` annotates, `hard` rejects over-budget `view_canvas` |
 
-The system prompt stays short. Evidence lives in Canvas; chat returns a two-to-four sentence verdict. Tune the recommended policy in `~/.dsh/canvas-viewer/settings.json`:
+- **JSON is data; TSX is code.** JSON uses strict schema and a fixed template. Open only trusted TSX. Default opaque-origin iframe/CSP disables network and avoids `unsafe-eval`; loading/errors never automatically fall back to parent execution. Compatibility execution needs explicit report-revision-scoped approval, may use `new Function`, and weakens isolation.
+- Host plugins have DSH process authority, not automatic protection from the Agent tool sandbox. TUI reads are read-only and reject symlinks/non-regular files. Scans, cache, previews and formatted output are bounded; `PARTIAL SCAN` discloses limits, and totals are not a complete disk inventory.
+- Browser uploads scale to a 1600px longest edge and compress to WebP. Host validates signatures, single-level names and a 2MB maximum. Controlled images are inlined at compile time; gallery thumbnails lazy-load only the first referenced image, never execute reports. No default remote CDN, team library or permission sync.
+- Authoring target: approximately ≤80 lines / ≤16KB / ≈4k source tokens. Estimates are diagnostics, not billing tokenization. JSON also has a 1.5MB read ceiling and structural budgets; see the [schema contract](skills/canvas-analysis-report/report-data.md).
 
-```json
-{
-  "budget": {
-    "maxLines": 120,
-    "maxBytes": 24000,
-    "maxTokens": 6000,
-    "enforce": "soft"
-  }
-}
-```
+[Sandbox](docs/SANDBOX.md) · [Assets](docs/ASSETS.md) · [Trade-offs](docs/COMPARISON.md)
 
-`soft` annotates; `hard` rejects an over-budget `view_canvas`. Token counts are stable heuristic diagnostics, not billing tokenizer output. Use `asset://` instead of embedding base64 in report source.
+## Compatibility and verification scope
 
-## Trust model
+| Baseline | Actual scope |
+| --- | --- |
+| CI: DSH `0.2.1-rc.2` | `dsh-smoke` pins `dsh-v0.2.1-rc.2` / `687f282e8625c6b8d11ff58211a90524be2e4317`; real Web profile, token/Cookie, combo factory and UI smoke. Consult the corresponding CI run for current changes |
+| Locally installed DSH: `0.2.0-rc.2` | Existing real Web composition/client activation evidence; **not the CI 0.2.1 baseline** |
+| Installed dsh-tui: `0.16.1` | Actual Cordis Loader + production admission-loader cold start, command/Scene lifecycle and reload; actual React terminal renderer and PTY → xterm → Edge visual verification |
+| Browser visuals | 12 capture scenarios covering wide/narrow, dark/light, search, scroll, resize, legacy and invalid data; actual Web workspace browser interactions also exist, with some Host behavior simulated by fixtures |
 
-Canvas files are executable TSX. The default iframe isolates DOM, network, and the host origin, but it is not a promise that untrusted code becomes safe: open only `.canvas.tsx` files you trust. The compatibility renderer requires an explicit user action and may use `new Function`; keep the default sandbox path when compatibility is not needed.
+TUI checks **do not establish full `dsh-tui` CLI/profile boot or user-profile installation acceptance**, nor every system terminal font. CI, local historical checks, fixtures and native renderer evidence remain distinct. [0.6.0 verification record](docs/VERIFICATION-0.6.0.md) · [CI configuration](.github/workflows/ci.yml)
 
-## Engineering and verification
+## Development, diagnosis and uninstall
 
 ```sh
-pnpm typecheck       # strict checks for src/host/*.mts
-pnpm build:host      # generate committed lib/host/*.mjs runtime artifacts
-pnpm test             # skill mirrors, types, Host, client, lifecycle, render, sandbox
-pnpm test:browser    # Playwright: bubble + real gallery thumbnail/upload + iframe
-pnpm audit --prod
-npm pack --dry-run
+pnpm install --frozen-lockfile
+pnpm build:host       # src/**/*.mts → lib/host and lib/report artifacts
+pnpm build:client     # src/client/*.js.part → one lib/client.js factory
+pnpm test            # package/types/artifacts, Host, workspace, schema, TUI, sandbox, lifecycle
+pnpm test:browser    # browser + simulated Host
+# Optional installed-host checks (environment requirements: docs/TUI.md):
+pnpm test:tui-runtime
+pnpm test:tui-browser
 ```
 
-The TypeScript migration is intentionally incremental: the security-sensitive asset boundary moved first, while `lib/host/assets.mjs` remains a directly loadable artifact for dsh Git installs. Future Host modules can follow the same source-to-artifact path without requiring install-time builds.
+Editing only `lib/client.js` fails artifact synchronization checks. Fragments share factory scope: no second runtime loader and no claim of a full TypeScript migration. Git contains runtime artifacts; installation does not require a build.
 
-Repository map:
+The authenticated Web page loads the client through `__DSH_BOOT__` / `__ModuleLoader__` and immutable `plugins/??...` combos, not the prebuilt shell. Diagnose the boot graph, `#dsh-canvas-viewer-css` and `[data-dsh-canvas-viewer]`. Client content changes use stat-poll/SSE HMR; restart after plugin-set or Host changes. [Client architecture](docs/CLIENT-ARCHITECTURE.md)
 
-```text
-lib/index.js                   Host plugin, view_canvas, routes, and prompt
-lib/client.js                  dsh external factory: viewer, bubble, gallery
-src/host/assets.mts            typed asset policy (emits lib/host/assets.mjs)
-skills/canvas-analysis-report/ dsh-native skill and SDK contract
-scripts/                       type, lifecycle, browser, render, and package checks
-docs/                          sandbox, client architecture, assets, and workflow docs
-```
-
-## Known boundaries
-
-- Report-level pixel thumbnails remain deferred; the gallery shows only the first source `asset://` image.
-- Local Host assets are not a CDN; there is no remote team gallery, upload service, or permission sync.
-- `lib/client.js` must remain a single factory entrypoint; UI source extraction must preserve the dsh loading contract.
-- Profile bundle add/remove requires a Web restart; client content changes are served through the Host stat-poll/SSE HMR path.
-
-More detail: [sandbox model](docs/SANDBOX.md) · [client architecture](docs/CLIENT-ARCHITECTURE.md) · [trade-offs](docs/COMPARISON.md) · [changelog](CHANGELOG.md)
+Disable/uninstall the bundle with `dsh plugin --profile web remove dsh-canvas-viewer` (substitute the TUI profile as needed), then restart. Remove the filesystem skill separately. Reports, assets and browser drafts are not automatically deleted; back up before cleanup.
 
 ## License
 
-MIT
+[MIT](LICENSE) · [Third-party notices](THIRD-PARTY-NOTICES.md)

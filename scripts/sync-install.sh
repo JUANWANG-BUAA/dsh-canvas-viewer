@@ -65,7 +65,7 @@ rsync -a \
   --delete \
   --include='lib/***' --include='skills/***' --include='docs/***' --include='assets/***' \
   --include='src/***' --include='tsconfig.json' \
-  --include='package.json' --include='cordis.patch.yml' \
+  --include='package.json' --include='cordis.patch.yml' --include='dsh-plugin.json' \
   --include='README.md' --include='AGENTS.md' --include='LICENSE' --include='CHANGELOG.md' \
   --include='README.en.md' \
   --include='THIRD-PARTY-NOTICES.md' \

@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "title": "双读者报告 · Native TUI / Web",
+  "summary": "同一份数据：终端安全阅读，Web 通过固定 SDK 渲染；无需执行报告提供的代码。",
+  "sections": [
+    {
+      "id": "verdict",
+      "title": "结论与关键指标",
+      "blocks": [
+        {
+          "type": "callout",
+          "tone": "success",
+          "title": "一份数据，两种读者",
+          "text": "版本 1 的数据报告保留清晰的标题、指标和表格。\n终端与 Web 使用同一经过校验的内容。"
+        },
+        {
+          "type": "metrics",
+          "items": [
+            {
+              "label": "Schema",
+              "value": 1,
+              "detail": "显式版本；拒绝未知结构"
+            },
+            {
+              "label": "读者",
+              "value": 2,
+              "detail": "Native TUI + Web"
+            },
+            {
+              "label": "报告代码执行",
+              "value": "无",
+              "detail": "只接受静态数据"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "text": "文本以原样字符呈现；HTML、TSX 和命令不具有执行语义。"
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "title": "证据与边界",
+      "blocks": [
+        {
+          "type": "table",
+          "columns": [
+            "检查项",
+            "结果",
+            "已验证",
+            "备注"
+          ],
+          "rows": [
+            [
+              "终端转义",
+              "拒绝",
+              true,
+              "LF / TAB 允许"
+            ],
+            [
+              "任意 URL 属性",
+              "拒绝",
+              true,
+              null
+            ],
+            [
+              "指标数量",
+              3,
+              true,
+              "有界数据"
+            ]
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "先读结论，再看证据。",
+            "检查原始数据和降级说明。",
+            "交互暂不引入执行能力。"
+          ]
+        },
+        {
+          "type": "bar-chart",
+          "items": [
+            {
+              "label": "校验",
+              "value": 4
+            },
+            {
+              "label": "呈现",
+              "value": 3
+            },
+            {
+              "label": "执行报告代码",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "type": "unsupported",
+          "label": "交互式钻取",
+          "reason": "版本 1 暂不支持；相关信息已在当前页面展开。"
+        }
+      ]
+    }
+  ]
+}

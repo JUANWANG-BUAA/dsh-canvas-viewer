@@ -1,6 +1,8 @@
 # Templates (compact)
 
-Always import from `"dsh/canvas"` and use only the [sdk.md](sdk.md) subset. Default-export a single component.
+**Choose format first.** For native TUI + Web, use the JSON skeleton in [report-data.md](report-data.md): verdict/title, summary, decision sections, evidence tables and ordered actions. There are no imports, callbacks, HTML, SVG or images in that schema; represent architecture as node/edge tables.
+
+The following framework templates are **optional trusted Web `.canvas.tsx` only**, for cases requiring tabs, SDK interaction or SVG. They remain executable, are not TUI templates and are not an automatic conversion path. Import from `"dsh/canvas"`, use only [sdk.md](sdk.md), and default-export one component. Replace all placeholders with actual evidence; do not keep demonstration claims.
 
 ## Investigation skeleton (trim to your evidence)
 
@@ -40,7 +42,7 @@ export default function Report() {
       {tab === "latency" && <Latency />}
       {tab === "ux" && <Ux />}
       {tab === "roadmap" && <Roadmap />}
-      <Text tone="tertiary" size="small">依据本地源码静态评审。写完请调用 view_canvas。</Text>
+      <Text tone="tertiary" size="small">依据本地源码静态评审。工具可用时调用 view_canvas。</Text>
     </Stack>
   );
 }
@@ -89,7 +91,7 @@ export default function Design() {
       )}
       {tab === "life" && <Table headers={["阶段","输入","工作","失败"]} rows={[["触发","事件","处理","取消/超时"]]} />}
       {tab === "contract" && <Table headers={["字段","含义","备注"]} rows={[["token","…","…"]]} />}
-      <Text tone="tertiary" size="small">写完后调用 view_canvas。</Text>
+      <Text tone="tertiary" size="small">view_canvas 可用时打开；否则提供文件路径。</Text>
     </Stack>
   );
 }

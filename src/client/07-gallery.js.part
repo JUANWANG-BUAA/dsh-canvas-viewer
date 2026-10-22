@@ -1,0 +1,330 @@
+    /* @client-module gallery: searchable settings library and asset thumbnails */
+    function CanvasRow(props) {
+      var item = props.item;
+      var onOpen = props.onOpen;
+      var onCopied = props.onCopied;
+      var onForget = props.onForget;
+      var onDelete = props.onDelete;
+      var busy = useState("");
+      var action = busy[0];
+      var setAction = busy[1];
+      var menuState = useState(false);
+      var menuOpen = menuState[0];
+      var setMenuOpen = menuState[1];
+
+      var runCopy = function (kind) {
+        setAction(kind);
+        setMenuOpen(false);
+        apiGet(API + "/refs?path=" + encodeURIComponent(item.path)).then(function (payload) {
+          var refs = payload.refs || {};
+          var text = refs[kind] || refs.path || item.path;
+          return copyText(text).then(function () {
+            onCopied(kind === "markdownLink" ? "已复制 Markdown 链接" : kind === "mention" ? "已复制 @ 引用" : kind === "toolHint" ? "已复制工具提示" : "已复制路径");
+          });
+        }).catch(function (err) {
+          onCopied(String(err && err.message || err));
+        }).finally(function () { setAction(""); });
+      };
+
+      return h("li", { className: "dsh-cv-lib-row", "data-missing": item.missing ? "1" : "0" },
+        h("div", { className: "dsh-cv-lib-row-main" },
+          item.assetRef ? h("img", {
+            className: "dsh-cv-lib-thumb",
+            src: API + "/assets/raw?name=" + encodeURIComponent(item.assetRef.replace(/^asset:\/\//, "")),
+            alt: "",
+            loading: "lazy",
+            onError: function (event) { event.currentTarget.dataset.broken = "1"; },
+          }) : null,
+          h("div", { className: "dsh-cv-lib-row-text" },
+            h("div", { className: "dsh-cv-lib-row-title" }, item.title),
+            h("div", { className: "dsh-cv-lib-row-path" }, item.shortPath || item.path),
+            (item.preview && item.preview.headline) ? h("div", {
+              className: "dsh-cv-lib-row-summary",
+              title: item.preview.headline,
+            }, item.preview.headline) : null,
+            h("div", { className: "dsh-cv-lib-row-meta" },
+              h("span", null, item.workspace || "Canvas"),
+              h("span", null, formatBytes(item.bytes)),
+              item.estimatedTokens ? h("span", null, "≈" + item.estimatedTokens + " tokens") : null,
+              h("span", null, item.openedAt ? ("打开于 " + formatTime(item.openedAt)) : ("修改于 " + formatTime(item.mtimeMs))),
+              item.overBudget ? h("span", { className: "dsh-cv-lib-row-warn" }, "超 " + ((item.violations || []).join("、") || "预算")) : null,
+              item.warnings && item.warnings.length ? h("span", { className: "dsh-cv-lib-row-warn" }, "含 " + item.warnings.join("、")) : null,
+              item.missing ? h("span", { className: "dsh-cv-lib-row-warn" }, "文件已失效") : null,
+            ),
+          ),
+        ),
+        h("div", { className: "dsh-cv-lib-actions" },
+          h("button", {
+            type: "button",
+            "data-primary": "1",
+            disabled: !!item.missing,
+            onClick: function () { onOpen(item.path); },
+          }, "打开"),
+          h("button", {
+            type: "button",
+            className: "dsh-cv-lib-more",
+            "aria-label": "更多操作",
+            "aria-expanded": menuOpen ? "true" : "false",
+            onClick: function () { setMenuOpen(!menuOpen); },
+          }, "···"),
+          menuOpen ? h("div", { className: "dsh-cv-lib-menu" },
+            h("button", { type: "button", disabled: !!action, onClick: function () { runCopy("shortPath"); } }, action === "shortPath" ? "复制中…" : "复制路径"),
+            h("button", { type: "button", disabled: !!action, onClick: function () { runCopy("markdownLink"); } }, "复制 Markdown"),
+            h("button", { type: "button", disabled: !!action, onClick: function () { runCopy("mention"); } }, "复制 @ 引用"),
+            onForget ? h("button", { type: "button", onClick: function () { setMenuOpen(false); onForget(item.path); } }, "移出最近") : null,
+            onDelete ? h("button", {
+              type: "button",
+              className: "dsh-cv-lib-danger",
+              disabled: !!item.missing,
+              onClick: function () { setMenuOpen(false); onDelete(item.path, item.title); },
+            }, "删除文件") : null,
+          ) : null,
+        ),
+      );
+    }
+
+    var GALLERY_PAGE_SIZE = 40;
+
+    function useCanvasLibraryData(mode, query, workspace) {
+      var refresh = useState(0);
+      var key = JSON.stringify([mode, mode === "all" ? query : "", workspace, refresh[0]]);
+      var state = useState({ key: "", loading: true, loadingMore: false, error: "", items: [], workspaces: [], total: null, nextOffset: null });
+      var data = state[0], setData = state[1];
+      var request = useRef({ sequence: 0, controller: null, pending: false });
+      var cancel = useCallback(function () {
+        request.current.sequence += 1;
+        if (request.current.controller) request.current.controller.abort();
+        request.current.controller = null;
+        request.current.pending = false;
+      }, []);
+      var loadPage = useCallback(function (offset, append) {
+        if (append && request.current.pending) return;
+        cancel();
+        var sequence = request.current.sequence;
+        var controller = new AbortController();
+        request.current.controller = controller;
+        request.current.pending = true;
+        setData(function (prev) {
+          return Object.assign({}, prev, {
+            key: key, loading: !append, loadingMore: !!append, error: "",
+            items: append ? prev.items : [], total: append ? prev.total : null,
+            nextOffset: append ? prev.nextOffset : null, truncated: false,
+          });
+        });
+        var url = mode === "recent" ? API + "/history" : API + "/list?q=" + encodeURIComponent(query)
+          + "&workspace=" + encodeURIComponent(workspace) + "&offset=" + offset + "&limit=" + GALLERY_PAGE_SIZE;
+        fetch(url, { signal: controller.signal }).then(function (res) {
+          return res.json().then(function (payload) {
+            if (!res.ok || !payload || payload.ok === false) throw new Error((payload && payload.error) || ("HTTP " + res.status));
+            if (!Array.isArray(payload.items)) throw new Error("图库响应缺少 items");
+            if (mode === "all" && payload.nextOffset != null
+              && (!Number.isSafeInteger(payload.nextOffset) || payload.nextOffset <= offset || !payload.items.length)) {
+              throw new Error("图库分页游标无效");
+            }
+            return payload;
+          });
+        }).then(function (payload) {
+          if (sequence !== request.current.sequence || controller.signal.aborted) return;
+          request.current.pending = false;
+          setData(function (prev) {
+            var items = append ? prev.items.concat(payload.items) : payload.items;
+            var seen = new Set();
+            items = items.filter(function (item) {
+              if (!item || typeof item.path !== "string" || seen.has(item.path)) return false;
+              seen.add(item.path);
+              return true;
+            });
+            return {
+              key: key, loading: false, loadingMore: false, error: "", items: items,
+              workspaces: Array.isArray(payload.workspaces) ? payload.workspaces : prev.workspaces,
+              total: Number.isSafeInteger(payload.total) && payload.total >= 0 ? payload.total : null,
+              nextOffset: mode === "all" && payload.nextOffset != null ? payload.nextOffset : null,
+              truncated: !!payload.truncated,
+            };
+          });
+        }).catch(function (err) {
+          if (sequence !== request.current.sequence || controller.signal.aborted) return;
+          request.current.pending = false;
+          setData(function (prev) {
+            return Object.assign({}, prev, { loading: false, loadingMore: false, error: String(err && err.message || err) });
+          });
+        });
+      }, [mode, query, workspace, key, cancel]);
+      var reload = useCallback(function () {
+        cancel();
+        refresh[1](function (version) { return version + 1; });
+      }, [cancel]);
+      useEffect(function () {
+        var timer = window.setTimeout(function () { loadPage(0, false); }, mode === "all" ? 220 : 0);
+        return function () { window.clearTimeout(timer); cancel(); };
+      }, [loadPage, mode, refresh[0], cancel]);
+      // Hide old rows immediately, including the debounce interval for a new filter.
+      var current = data.key === key ? data : Object.assign({}, data, {
+        loading: true, loadingMore: false, error: "", items: [], total: null, nextOffset: null, truncated: false,
+      });
+      return {
+        data: current,
+        reload: reload,
+        loadMore: function () {
+          if (!current.loading && current.nextOffset != null) loadPage(current.nextOffset, true);
+        },
+      };
+    }
+
+    function CanvasLibraryPage() {
+      var toastApi = useToast();
+      var modeState = useState("all");
+      var mode = modeState[0];
+      var setMode = modeState[1];
+      var queryState = useState("");
+      var query = queryState[0];
+      var setQuery = queryState[1];
+      var wsState = useState("all");
+      var workspace = wsState[0];
+      var setWorkspace = wsState[1];
+      var library = useCanvasLibraryData(mode, query, workspace);
+      var data = library.data;
+      var reload = library.reload;
+      var uploadState = useState(false);
+      var uploading = uploadState[0];
+      var setUploading = uploadState[1];
+
+      var items = data.items.filter(function (item) {
+        return mode !== "recent" || workspace === "all" || item.workspaceId === workspace;
+      });
+
+      var openPath = function (path) {
+        requestOpenCanvas(path);
+        toastApi.show("已在浮窗打开");
+      };
+
+      var forget = function (path) {
+        apiPost(API + "/history/forget", { path: path }).then(reload).catch(function (err) {
+          toastApi.show(String(err && err.message || err));
+        });
+      };
+
+      var removeFile = function (path, title) {
+        if (!window.confirm("确定删除文件 " + (title || path) + " ？此操作不可恢复。")) return;
+        apiPost(API + "/files/delete", { path: path }).then(function () {
+          toastApi.show("已删除 " + (title || ""));
+          reload();
+        }).catch(function (err) {
+          toastApi.show(String(err && err.message || err));
+        });
+      };
+
+      var clearRecent = function () {
+        apiPost(API + "/history/clear", {}).then(function () {
+          toastApi.show("已清空最近记录");
+          reload();
+        }).catch(function (err) {
+          toastApi.show(String(err && err.message || err));
+        });
+      };
+
+      var uploadAsset = function (event) {
+        var file = event.target.files && event.target.files[0];
+        event.target.value = "";
+        if (!file) return;
+        setUploading(true);
+        compressAsset(file).then(function (asset) {
+          return apiPost(API + "/assets", asset);
+        }).then(function (asset) {
+          toastApi.show("已上传 " + asset.name + "（已压缩为 WebP）");
+        }).catch(function (err) {
+          toastApi.show(String(err && err.message || err));
+        }).finally(function () { setUploading(false); });
+      };
+
+      return h("div", { className: "dsh-cv-lib", "data-dsh-cv-lib": "", "aria-busy": data.loading || data.loadingMore },
+        h("div", { className: "dsh-cv-lib-topline" },
+          h("div", { className: "dsh-cv-lib-head" },
+            h("h3", { className: "dsh-cv-lib-title" }, "Canvas 图库"),
+            h("p", { className: "dsh-cv-lib-desc" }, "报告、引用与预览"),
+          ),
+          h("div", { className: "dsh-cv-lib-topline-actions" },
+            h("span", { className: "dsh-cv-lib-count" }, data.loading ? "加载中…" : mode === "all" && data.total != null ? ("已加载 " + items.length + " / " + data.total + " 项") : (items.length + " 项")),
+            h("button", {
+              type: "button",
+              className: "dsh-cv-btn",
+              title: "切换浅色/深色主题",
+              "aria-label": "切换主题",
+              onClick: toggleTheme,
+            }, "◐"),
+          ),
+        ),
+        h("div", { className: "dsh-cv-lib-toolbar" },
+          h("div", { className: "dsh-cv-lib-seg" },
+            h("button", { type: "button", "data-on": mode === "recent" ? "1" : "0", onClick: function () { setMode("recent"); } }, "最近"),
+            h("button", { type: "button", "data-on": mode === "all" ? "1" : "0", onClick: function () { setMode("all"); } }, "全部"),
+          ),
+          mode === "all" ? h("input", {
+            className: "dsh-cv-lib-search",
+            value: query,
+            placeholder: "搜索报告正文、文件名、路径或工作区…",
+            "aria-label": "搜索报告正文、文件名、路径或工作区",
+            onChange: function (event) { setQuery(event.target.value); },
+          }) : null,
+          h("select", {
+            className: "dsh-cv-lib-select",
+            "aria-label": "筛选工作区",
+            value: workspace,
+            onChange: function (event) { setWorkspace(event.target.value); },
+          },
+            h("option", { value: "all" }, "全部工作区"),
+            (data.workspaces || []).map(function (ws) {
+              return h("option", { key: ws.id, value: ws.id }, ws.label);
+            }),
+          ),
+          mode === "recent" ? h("button", { type: "button", className: "dsh-cv-btn", onClick: clearRecent }, "清空最近") : null,
+          h("label", { className: "dsh-cv-btn", title: "浏览器端缩放并压缩为 WebP 后上传到 ~/.dsh/canvas-assets/" },
+            uploading ? "压缩上传中…" : "上传图片",
+            h("input", { type: "file", accept: "image/*", hidden: true, disabled: uploading, onChange: uploadAsset }),
+          ),
+        ),
+        data.error ? h("div", { className: "dsh-cv-lib-error", role: "alert" },
+          (items.length ? "加载更多失败：" : "加载失败：") + data.error,
+          h("button", { type: "button", className: "dsh-cv-btn", onClick: items.length && data.nextOffset != null ? library.loadMore : reload }, "重试"),
+        ) : null,
+        data.loading ? h("p", { className: "dsh-cv-lib-truncated", role: "status" }, "正在加载图库…") : null,
+        !data.loading && !data.error && items.length === 0
+          ? h("div", { className: "dsh-cv-lib-empty" },
+            h("span", { className: "dsh-cv-lib-empty-glyph", "aria-hidden": "true" }, "▤"),
+            h("p", { className: "dsh-cv-lib-empty-title" }, mode === "recent" ? "还没有打开记录" : "没有匹配的 canvas 文件"),
+            h("p", { className: "dsh-cv-lib-empty-hint" },
+              mode === "recent"
+                ? "打开对话里的 .canvas.tsx / .canvas.json 报告后，这里会留下可再次打开的记录。"
+                : query
+                  ? ("报告正文、文件名、路径或工作区均未匹配「" + query + "」。")
+                  : "这个工作区还没有 .canvas.tsx / .canvas.json 报告。",
+            ),
+            h("div", { className: "dsh-cv-lib-empty-actions" },
+              mode === "recent" ? h("button", { type: "button", onClick: function () { setMode("all"); setWorkspace("all"); } }, "浏览全部") : null,
+              mode === "all" && (query || workspace !== "all") ? h("button", {
+                type: "button",
+                onClick: function () { setQuery(""); setWorkspace("all"); },
+              }, "清除筛选") : null,
+            ),
+          )
+          : h("ul", { className: "dsh-cv-lib-list" },
+            items.map(function (item) {
+              return h(CanvasRow, {
+                key: item.path + String(item.openedAt || item.mtimeMs || 0),
+                item: item,
+                onOpen: openPath,
+                onCopied: toastApi.show,
+                onForget: mode === "recent" ? forget : null,
+                onDelete: mode === "all" ? removeFile : null,
+              });
+            }),
+          ),
+        mode === "all" && data.nextOffset != null ? h("button", {
+          type: "button", className: "dsh-cv-btn", disabled: data.loadingMore || data.loading, onClick: library.loadMore,
+        }, data.loadingMore ? "加载更多中…" : "加载更多") : null,
+        !data.loading && data.truncated && data.nextOffset == null ? h("p", { className: "dsh-cv-lib-truncated" }, "部分结果未返回；请刷新或缩小搜索范围。") : null,
+        toastApi.toast ? h("div", { className: "dsh-cv-lib-toast", role: "status" }, toastApi.toast) : null,
+      );
+    }
+
+    var inject = ["slots", "uiConversation"];

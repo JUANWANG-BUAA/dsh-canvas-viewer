@@ -1,0 +1,19 @@
+window.__ModuleLoader__.load({
+  id: "dsh-canvas-viewer",
+  factory: (require) => {
+    var module = { exports: {} };
+    var exports = module.exports;
+    var React = require("react");
+    var ReactDOM = require("react-dom/client");
+
+    var h = React.createElement;
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+    var useRef = React.useRef;
+    var useMemo = React.useMemo;
+    var useCallback = React.useCallback;
+
+    var API = "/api/canvas";
+    var CANVAS_RE = /(?:^|[\s"'`(])((?:~\/|\.{0,2}\/)?[^\s"'`)]+\.canvas\.(?:tsx|json))\b/;
+    var STYLE_ID = "dsh-canvas-viewer-css";
+    var externalOpen = null;

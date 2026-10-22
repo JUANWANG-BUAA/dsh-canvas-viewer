@@ -77,9 +77,12 @@ jobs:
       - name: Build harness (lib + web)
         run: corepack pnpm run build
         working-directory: .harness
+      - name: Install browser for real DSH UI validation
+        run: pnpm exec playwright install --with-deps chromium
       - name: Real DSH canvas composition smoke
         run: node scripts/dsh-smoke.mjs
         env:
           HARNESS_DIR: ${{ github.workspace }}/.harness
           DSH_HOME: ${{ runner.temp }}/dsh-canvas-smoke-home
           PACK_PLUGIN: 1
+          DSH_BROWSER_SMOKE: 1
